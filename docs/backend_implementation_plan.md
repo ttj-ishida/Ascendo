@@ -1637,10 +1637,20 @@ export async function createAssessment(
   deps: { userClient: SupabaseClient },
   params: { userId: string; sourceGroupIds: string[]; itemCount: number },
 ): Promise<{ id: string; status: 'in_progress'; items: AssessmentItem[] }> {
-  const { data: candidates, error: candidatesError } = await deps.userClient
+  const { data: rawCandidates, error: candidatesError } = await deps.userClient
     .from('content_group_items')
     .select('content_id, learning_contents(type)')
     .in('content_group_id', params.sourceGroupIds);
+
+  // Without generated Supabase types (no `supabase gen types typescript` run against the real
+  // project), supabase-js can't tell this is a to-one join (content_group_items.content_id ->
+  // learning_contents.id) and infers `learning_contents` as an array under tsc --noEmit. It's
+  // actually always exactly one row per data_model_design.md's FK, so cast through our own
+  // known shape (found the first time `npm run typecheck` was run for this task).
+  const candidates = (rawCandidates ?? []) as unknown as {
+    content_id: string;
+    learning_contents: { type: AssessmentItem['contentType'] };
+  }[];
 
   if (candidatesError) {
     throw new Error(`failed to load candidate content: ${candidatesError.message}`);
