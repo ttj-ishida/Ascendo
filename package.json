@@ -1,0 +1,12 @@
+{
+  "name": "ascendo-db",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Supabase migrations and local dev workflow for the Ascendo backend.",
+  "scripts": {
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:smoke-test": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -f supabase/tests/smoke_test.sql"
+  }
+}
