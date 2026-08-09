@@ -1,0 +1,26 @@
+{
+  "name": "ascendo-backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Node.js/TypeScript backend for Ascendo's 5 REST endpoints (docs/api_design.md).",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "tsx --test tests/**/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "express": "^4.21.0",
+    "jose": "^5.9.0",
+    "openai": "^4.68.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
