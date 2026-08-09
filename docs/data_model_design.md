@@ -140,6 +140,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare
   v_admin_id uuid := auth.uid();
+  v_row jsonb := to_jsonb(coalesce(new, old));
 begin
   -- auth.uid()がnull(=通常はservice_role等、ユーザーコンテキストのない接続)の場合は
   -- 「誰が」の記録ができないため監査ログはスキップする。バックエンドは常にユーザー自身の
@@ -152,7 +153,10 @@ begin
   values (
     v_admin_id,
     TG_TABLE_NAME,
-    coalesce(new.id, old.id),
+    -- NEW.id/OLD.idを直接参照すると、id列を持たないテーブル(複合主キーのcontent_tags等、
+    -- content_idが主キーのvocabulary_items等)で実行時に「column "id" does not exist」エラーになる。
+    -- to_jsonbで安全に取り出し、存在しなければnullにする(その場合もbefore/afterに全カラムが残る)。
+    nullif(v_row ->> 'id', '')::uuid,
     lower(TG_OP),
     case when TG_OP in ('UPDATE', 'DELETE') then to_jsonb(old) else null end,
     case when TG_OP = 'UPDATE' then to_jsonb(new) else null end
@@ -164,6 +168,8 @@ $$;
 ```
 
 **適用対象テーブル**(`api_design.md` 6章の未確定事項をここで確定): `learning_contents`, `vocabulary_items`, `grammar_items`, `listening_items`, `shadowing_items`, `listening_passages`, `content_groups`, `content_group_items`, `tags`, `content_tags`, `content_group_tags` の`after update or delete`。`profiles`のみ例外的に、保護列(`plan_tier`/`paid_until`/`status`)が変化した時だけ発火する`when`条件付きトリガーにする(通常のプロフィール編集まで監査ログに残さないため)。具体的なトリガー文は各テーブルのDDL末尾に記載する。
+
+> **見つかったバグの記録**: 当初`coalesce(new.id, old.id)`で行IDを取得する実装にしていたが、`content_tags`/`content_group_tags`(複合主キー、`id`列なし)と`vocabulary_items`/`grammar_items`/`listening_items`/`shadowing_items`(主キーが`content_id`、`id`列なし)に監査トリガーを適用すると、実行時に`column "id" does not exist`で確実に失敗する構成になっていた。Docker/Supabase CLI環境がなく実機検証していないため、目視レビューで発見し上記の通り修正した。他にも未発見の同種バグが残っている可能性がある(7章参照)。
 
 ### 2-7. `check_test_completion()` — テスト完了判定(全問回答でstatus自動更新)
 
@@ -728,7 +734,7 @@ create table public.admin_audit_logs (
   id uuid primary key default gen_random_uuid(),
   admin_id uuid not null references public.admins(id),
   table_name text not null,
-  row_id uuid not null,
+  row_id uuid,  -- id列を持たないテーブル(複合主キー等)ではnull。全カラムはbefore/afterに残る
   action text not null check (action in ('update', 'delete')),
   before jsonb,
   after jsonb,
