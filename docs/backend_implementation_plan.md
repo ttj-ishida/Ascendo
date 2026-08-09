@@ -99,12 +99,16 @@ test('GET /health returns 200 ok', async () => {
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "outDir": "dist",
     "rootDir": "."
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"]
 }
 ```
+
+`allowImportingTsExtensions`/`noEmit` are required together because every import in this codebase uses an explicit `.ts` extension (Node's `NodeNext` ESM resolution requires it) — without them, `tsc --noEmit` (Task 6 onward) fails with `TS5097` even though `tsx` runs the same files fine at test/dev time. This surfaced the first time `npm run typecheck` was actually run (Task 6), not from reading the config alone — Task 1's steps only ran `npm test`, not `npm run typecheck`, so this was invisible until later.
 
 - [ ] **Step 4: Create `.env.example` and `.gitignore`**
 
