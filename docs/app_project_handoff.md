@@ -3,7 +3,7 @@
 Claude(claude.ai)との会話で行った要件定義〜DB設計のサマリー。実装フェーズを引き継ぐ際の起点として参照する。
 
 > プロダクト名: **Ascendo**(旧称「学習アプリ」)。リポジトリ内の配置場所は`apps/ascendo/docs/`
-> 関連ファイル一式: `requirements_mvp.md`、`requirements_supplementary.md`、`screen_flow.md`、`data_model_design.md`(未作成)、`db_design_decisions_and_notes.md`、`api_design.md`(本ファイルと合わせて7ファイル)
+> 関連ファイル一式: `requirements_mvp.md`、`requirements_supplementary.md`、`screen_flow.md`、`data_model_design.md`、`db_design_decisions_and_notes.md`、`api_design.md`(本ファイルと合わせて7ファイル)
 > ※英語学習ロードマップ個人利用ツール(`apps/roadmap-tool/`の`english_roadmap.html`等)とは**別プロジェクト**。混同注意。
 
 ---
@@ -79,15 +79,16 @@ Claude(claude.ai)との会話で行った要件定義〜DB設計のサマリー�
 
 ## 6. 学習計画JSONスキーマ
 
-`data_model_design.md`の「3. 学習計画JSONスキーマ」にTypeScript型定義(`LearningPlanJSON`, `LearningPhase`, `WeeklyTask`, `MonthlyTask`)とJSON例を掲載済み。AIには既存の`content_groups`一覧をコンテキストとして渡し、`contentGroupIds`に実在するIDを埋め込ませる方式(コンテンツ自体は生成させない)。
+`data_model_design.md`の「6. LearningPlanJSONスキーマ」にTypeScript型定義(`LearningPlanJSON`, `LearningPhase`, `WeeklyTask`, `MonthlyTask`)を掲載済み。AIには既存の`content_groups`一覧をコンテキストとして渡し、`contentGroupIds`に実在するIDを埋め込ませる方式(コンテンツ自体は生成させない)。
 
 ## 7. 未着手・今後の検討事項
 
-- **API設計**: エンドポイント一覧、リクエスト/レスポンス仕様(次フェーズの候補)
 - **認証・認可の実装詳細**: SupabaseAuthとNode.jsバックエンドの連携方式、JWT検証
 - **Phase2機能の詳細設計**: 忘却曲線アルゴリズム(SM-2等)、ストア課金(react-native-iap/RevenueCat)、広告SDK選定
 - **残る要確認事項**(`requirements_mvp.md`より): 決済手段の最終選定、無料プランの追加制限値(運用しながら調整する前提)
-- **既知の未対応事項**(`db_design_decisions_and_notes.md`より): `tests`の削除ポリシー、`position`列の一意制約、`ai_usage_logs`のコスト精度指定
+- **既知の未対応事項**(`db_design_decisions_and_notes.md`より): `tests`の削除ポリシー、`content_group_items`/`test_items`の`position`列の一意制約(`ai_usage_logs`のコスト精度は`data_model_design.md`で`numeric(10,6)`として確定済み)
+
+> API設計(エンドポイント一覧・リクエスト/レスポンス仕様)とDDL本体(`data_model_design.md`)は完了済み。次の主な未着手事項は上記の認証・認可の実装詳細
 
 ## 8. このプロジェクトを引き継ぐ際の依頼例
 

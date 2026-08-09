@@ -221,9 +221,8 @@ interface DeleteAccountRequest {
 
 ## 6. 未着手・今後の検討事項
 
-- `LearningPlanJSON`型の正式定義(`data_model_design.md`が未作成のため、5-2では仮の型名のみ参照している)
 - OpenAPI仕様書としての形式化(エンドポイント数が少ないため優先度は低い)
 - 認証・認可の実装詳細(Supabase AuthとNode.jsバックエンドの連携方式、JWT検証の具体的なコード設計)
 - `POST /api/v1/plans/chat`の会話コンテキストが長くなった場合のトークン数対策(要約・切り詰め戦略)
-- テスト完了判定トリガーの具体的な実装(全`test_items`に対応する`learning_records`が揃った時点で`tests.status`を更新するロジック)
-- DBトリガーによる監査ログ記録(ADR-14)の対象テーブル一覧の確定と、`log_admin_action()`関数の実装
+
+> 以前ここに記載していた「`LearningPlanJSON`型の正式定義」「テスト完了判定トリガーの実装」「監査ログ対象テーブル一覧の確定」は、`data_model_design.md`(DDL本体、`db_design_decisions_and_notes.md`のADR-13/14を踏まえて復元・作成)で対応済み
