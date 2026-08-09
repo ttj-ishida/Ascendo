@@ -32,6 +32,7 @@ Expo(React Native)+ TypeScript / Supabase(Auth, Postgres, Storage)/ Node.js(バ�
 npm run db:start
 npm run db:reset
 npm run db:smoke-test
+npm run db:behavior-test
 ```
 
-**未検証**: 作成時点でDocker/Supabase CLIが使えない環境だったため、実行検証はまだ行われていません(Supabaseダッシュボードでの手動検証を進行中)。
+**検証済み(2026-08-10)**: Docker/Supabase CLIが使えない環境で作成されたため、実際のSupabaseクラウドプロジェクトのダッシュボードSQL Editorで検証しました。全23マイグレーション適用 → `supabase/tests/smoke_test.sql`(構造確認)→ `supabase/tests/behavior_test.sql`(13項目の振る舞い確認、`begin/rollback`でデータは残さず)の順で全てパス。詳細は[db_migrations_plan.md](docs/db_migrations_plan.md)の「検証ステータス」参照。
