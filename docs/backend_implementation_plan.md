@@ -986,7 +986,7 @@ test('chatTurn returns the AI reply and readyToGenerate flag, and logs usage', a
   };
 
   const result = await chatTurn(
-    { aiAdapter, serviceClient: client },
+    { aiAdapter, serviceClient: client as never },
     { targetLang: 'en', messages: [{ role: 'user', content: 'I want to learn English' }], userId: '11111111-1111-1111-1111-111111111111' },
   );
 
@@ -1004,7 +1004,7 @@ test('chatTurn rejects an empty messages array with INVALID_MESSAGES', async () 
   };
 
   await assert.rejects(
-    () => chatTurn({ aiAdapter, serviceClient: client }, { targetLang: 'en', messages: [], userId: 'x' }),
+    () => chatTurn({ aiAdapter, serviceClient: client as never }, { targetLang: 'en', messages: [], userId: 'x' }),
     (err: unknown) => err instanceof AppError && err.code === 'INVALID_MESSAGES',
   );
 });
@@ -1014,6 +1014,8 @@ test('chatTurn rejects an empty messages array with INVALID_MESSAGES', async () 
 
 Run: `cd backend && npm test`
 Expected: FAIL — `Cannot find module '../../src/domains/plans/service.ts'`
+
+Note: the two `serviceClient: client as never` casts above are required for `npm run typecheck` to pass later (Task 6 discovered that `chatTurn`'s `deps.serviceClient: Pick<SupabaseClient, 'from'>` type-checks a fake's `.from()` return value against the full `PostgrestQueryBuilder` shape, which a minimal test fake never satisfies structurally — the same pattern already used in Task 7's `admin.test.ts`).
 
 - [ ] **Step 3: Implement `domains/plans/service.ts` (chat portion only — `createPlan` is added in Task 9)**
 
