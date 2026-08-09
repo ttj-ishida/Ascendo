@@ -594,9 +594,10 @@ import { createUserClient, createServiceClient } from '../../src/shared/supabase
 
 test('createUserClient forwards the caller access token as a Bearer header', () => {
   const client = createUserClient('https://ascendo.supabase.co', 'anon-key', 'user-access-token');
-  // @supabase/supabase-js exposes the configured headers on the internal REST client;
-  // this is the cheapest way to prove the token was actually wired in without a network call.
-  const headers = (client as unknown as { rest: { headers: Record<string, string> } }).rest.headers;
+  // @supabase/supabase-js@2.112.2 exposes the configured global headers on client.headers
+  // (confirmed by inspecting Object.keys(client) when this task was executed); this is the
+  // cheapest way to prove the token was actually wired in without a network call.
+  const headers = (client as unknown as { headers: Record<string, string> }).headers;
   assert.equal(headers.Authorization, 'Bearer user-access-token');
 });
 
@@ -634,7 +635,7 @@ export function createServiceClient(supabaseUrl: string, serviceRoleKey: string)
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd backend && npm test`
-Expected: PASS — both tests in `shared/supabase-client.test.ts`. If the internal `rest.headers` path doesn't exist on the installed `@supabase/supabase-js` version, the test will fail with a clear "Cannot read properties of undefined" — if that happens, inspect `client` with `console.log(Object.keys(client))` and adjust the assertion path to whatever internal field actually holds the configured headers in that version.
+Expected: PASS — both tests in `shared/supabase-client.test.ts`. (Executed against `@supabase/supabase-js@2.112.2`: the headers live at `client.headers`, not `client.rest.headers` — confirmed via `console.log(Object.keys(client))`. If a future version moves them again, the test will fail with a clear "Cannot read properties of undefined"; re-inspect and adjust the assertion path.)
 
 - [ ] **Step 5: Commit**
 
