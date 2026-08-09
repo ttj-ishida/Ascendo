@@ -3,7 +3,7 @@
 Claude(claude.ai)との会話で行った要件定義〜DB設計のサマリー。実装フェーズを引き継ぐ際の起点として参照する。
 
 > プロダクト名: **Ascendo**(旧称「学習アプリ」)。リポジトリ内の配置場所は`apps/ascendo/docs/`
-> 関連ファイル一式: `requirements_mvp.md`、`requirements_supplementary.md`、`screen_flow.md`、`data_model_design.md`、`db_design_decisions_and_notes.md`、`api_design.md`(本ファイルと合わせて7ファイル)
+> 関連ファイル一式: `requirements_mvp.md`、`requirements_supplementary.md`、`screen_flow.md`、`data_model_design.md`、`db_design_decisions_and_notes.md`、`api_design.md`、`auth_design.md`(本ファイルと合わせて8ファイル)
 > ※英語学習ロードマップ個人利用ツール(`apps/roadmap-tool/`の`english_roadmap.html`等)とは**別プロジェクト**。混同注意。
 
 ---
@@ -83,12 +83,12 @@ Claude(claude.ai)との会話で行った要件定義〜DB設計のサマリー�
 
 ## 7. 未着手・今後の検討事項
 
-- **認証・認可の実装詳細**: SupabaseAuthとNode.jsバックエンドの連携方式、JWT検証
 - **Phase2機能の詳細設計**: 忘却曲線アルゴリズム(SM-2等)、ストア課金(react-native-iap/RevenueCat)、広告SDK選定
 - **残る要確認事項**(`requirements_mvp.md`より): 決済手段の最終選定、無料プランの追加制限値(運用しながら調整する前提)
 - **既知の未対応事項**(`db_design_decisions_and_notes.md`より): `tests`の削除ポリシー、`content_group_items`/`test_items`の`position`列の一意制約(`ai_usage_logs`のコスト精度は`data_model_design.md`で`numeric(10,6)`として確定済み)
+- **`auth_design.md`の残課題**: レートリミット未設計、JWKSキャッシュ・鍵ローテーション対応の詳細
 
-> API設計(エンドポイント一覧・リクエスト/レスポンス仕様)とDDL本体(`data_model_design.md`)は完了済み。次の主な未着手事項は上記の認証・認可の実装詳細
+> 要件定義・DB設計(DDL含む)・API設計・認証認可設計は完了済み。次の主な未着手事項はPhase2機能の詳細設計と、残る要確認事項(決済手段・無料プラン制限値)
 
 ## 8. このプロジェクトを引き継ぐ際の依頼例
 
