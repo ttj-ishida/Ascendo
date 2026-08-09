@@ -6,7 +6,7 @@ AIがユーザーのレベル・実績に応じて学習計画・学習コンテ
 
 ## 現在の状態
 
-要件定義・DB設計(DDL含む)・API設計・認証認可設計まで完了。実装はまだ着手していません。
+要件定義・DB設計(DDL含む、実機検証済み)・API設計・認証認可設計が完了。**バックエンド(`backend/`, 5エンドポイント)を実装済み**(`npm test`39件全パス・型チェッククリーン)。フロントエンド(Expo)は未着手。
 
 ## ドキュメント
 
@@ -18,7 +18,22 @@ AIがユーザーのレベル・実績に応じて学習計画・学習コンテ
 - [db_design_decisions_and_notes.md](docs/db_design_decisions_and_notes.md) — DB設計のADR・マイグレーション実行順序
 - [api_design.md](docs/api_design.md) — APIアーキテクチャ・エンドポイント一覧・リクエスト/レスポンス仕様
 - [auth_design.md](docs/auth_design.md) — 認証・認可の実装設計
-- [db_migrations_plan.md](docs/db_migrations_plan.md) — Supabaseマイグレーション実装計画
+- [db_migrations_plan.md](docs/db_migrations_plan.md) — Supabaseマイグレーション実装計画(検証済み)
+- [backend_implementation_plan.md](docs/backend_implementation_plan.md) — Node.jsバックエンド実装計画(実装・検証済み)
+
+## バックエンド(`backend/`)
+
+Express + TypeScript。5エンドポイント全て実装済み、Docker・実APIキーなしで自動テストが通る設計(依存性注入でSupabase/AIクライアントをフェイクに差し替え可能)。
+
+```bash
+cd backend
+npm install
+npm test          # 39 tests, no network calls
+npm run typecheck
+npm run dev        # 実際に起動する場合は .env.example を .env にコピーして値を埋める
+```
+
+実際のSupabase/Claude/OpenAIに対する疎通確認は未実施(実APIキーが必要なため、意図的に手動検証のみ。詳細は[backend_implementation_plan.md](docs/backend_implementation_plan.md) Task 14参照)。
 
 ## 技術スタック
 
