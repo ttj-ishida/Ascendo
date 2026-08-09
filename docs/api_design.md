@@ -103,8 +103,125 @@ flowchart LR
 
 ---
 
-## 5. 未着手・今後の検討事項
+## 5. リクエスト/レスポンス仕様
 
+TypeScript型定義で記載する(バックエンド・Expoクライアント双方TypeScriptのため、そのまま型共有できる想定)。
+
+### 5-1. `POST /api/v1/plans/chat`
+
+```ts
+interface PlanChatRequest {
+  targetLang: string;       // 学習対象言語コード(例: "en")。MVPでは "en" のみ有効
+  messages: ChatMessage[];  // 会話履歴全体。クライアント側で保持し毎回渡す(サーバー側セッション永続化なし)
+}
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface PlanChatResponse {
+  reply: string;            // AIの応答テキスト(チャットUIに表示)
+  readyToGenerate: boolean; // true: 目標・レベル・週あたり学習時間が出揃い、計画生成に進める状態
+}
+```
+
+**エラー**: `401 UNAUTHORIZED`(未ログイン)、`422 INVALID_MESSAGES`(`messages`が空/不正)、`502 AI_PROVIDER_ERROR`(Claude/OpenAI呼び出し失敗)
+
+### 5-2. `POST /api/v1/plans`
+
+```ts
+interface CreatePlanRequest {
+  targetLang: string;
+  messages: ChatMessage[];  // 計画生成の根拠にする対話履歴(通常はchatで積み上げた全文脈)
+}
+
+interface LearningPlanResponse {
+  id: string;
+  targetLang: string;
+  status: 'active';
+  planJson: LearningPlanJSON; // data_model_design.md定義予定の型(フェーズ/週次タスク/月次タスク/マイルストーン)
+  createdAt: string;          // ISO8601
+}
+```
+
+**エラー**:
+- `403 FREE_QUOTA_EXHAUSTED` — 無料枠(生涯1回、ユーザー単位)を既に消費済み。MVP時点では課金導線がないため回復手段なし(案内表示のみ)
+- `409 ACTIVE_PLAN_EXISTS` — 同一`targetLang`で既にactiveな計画が存在(ADR-13の部分ユニーク制約)
+- `422 INVALID_MESSAGES` / `502 AI_PROVIDER_ERROR` — 5-1と同様
+
+### 5-3. `POST /api/v1/content/listening-passages/{id}/audio`
+
+```ts
+// path param: id = listening_passages.id
+
+interface GenerateAudioRequest {
+  voice?: string;            // OpenAI TTSの音声名。省略時は管理者設定のデフォルト音声
+  forceRegenerate?: boolean; // true: キャッシュを無視して再生成(既定false)
+}
+
+interface GenerateAudioResponse {
+  listeningPassageId: string;
+  audioUrl: string;   // Supabase Storage上の音声ファイルURL
+  cached: boolean;     // true: 既存キャッシュを返した(新規AI呼び出しなし)
+  costUsd?: number;    // 新規生成時のみ付与(ai_usage_logsと同じ値)
+}
+```
+
+**エラー**: `403 ADMIN_ONLY`(管理者以外)、`404 PASSAGE_NOT_FOUND`、`502 AI_PROVIDER_ERROR`
+
+### 5-4. `POST /api/v1/assessments`
+
+```ts
+interface CreateAssessmentRequest {
+  sourceGroupIds: string[]; // 出題対象とする content_groups.id の配列
+  itemCount: number;        // 出題数
+}
+
+interface AssessmentResponse {
+  id: string;                // tests.id
+  status: 'in_progress';
+  items: AssessmentItem[];   // 出題順
+}
+
+interface AssessmentItem {
+  position: number;
+  contentId: string;
+  contentType: 'vocabulary' | 'grammar' | 'listening' | 'shadowing';
+}
+```
+
+**エラー**: `404 GROUP_NOT_FOUND`(未公開/存在しないグループIDを含む)、`422 INSUFFICIENT_ITEMS`(`itemCount`が対象グループの保有数を超える)
+
+### 5-5. `DELETE /api/v1/identity/me`
+
+```ts
+interface DeleteAccountRequest {
+  confirmation: 'DELETE'; // 誤操作防止のための固定文字列確認
+}
+```
+
+レスポンス: `204 No Content`
+
+**エラー**: `400 CONFIRMATION_MISMATCH`、`401 UNAUTHORIZED`
+
+### 5-6. 共通エラーコード一覧
+
+| コード | HTTPステータス | 意味 |
+|---|---|---|
+| `UNAUTHORIZED` | 401 | JWT欠落・無効 |
+| `ADMIN_ONLY` | 403 | 管理者権限が必要 |
+| `FREE_QUOTA_EXHAUSTED` | 403 | AI学習計画生成の無料枠を消費済み |
+| `ACTIVE_PLAN_EXISTS` | 409 | 同一言語でactiveな学習計画が既に存在 |
+| `GROUP_NOT_FOUND` / `PASSAGE_NOT_FOUND` | 404 | 参照先リソースが存在しない/未公開 |
+| `INVALID_MESSAGES` / `INSUFFICIENT_ITEMS` / `CONFIRMATION_MISMATCH` | 422 / 400 | リクエストボディのバリデーションエラー |
+| `AI_PROVIDER_ERROR` | 502 | Claude/OpenAI呼び出し失敗(タイムアウト・レート制限含む) |
+
+---
+
+## 6. 未着手・今後の検討事項
+
+- `LearningPlanJSON`型の正式定義(`data_model_design.md`が未作成のため、5-2では仮の型名のみ参照している)
 - OpenAPI仕様書としての形式化(エンドポイント数が少ないため優先度は低い)
 - 認証・認可の実装詳細(Supabase AuthとNode.jsバックエンドの連携方式、JWT検証の具体的なコード設計)
 - `POST /api/v1/plans/chat`の会話コンテキストが長くなった場合のトークン数対策(要約・切り詰め戦略)
