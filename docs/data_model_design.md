@@ -208,6 +208,33 @@ after insert on public.learning_records
 for each row execute function public.check_test_completion();
 ```
 
+### 2-8. `increment_actual_minutes()` — 学習時間の自動計測(アトミック加算)
+
+`frontend_design.md`で決定した「実績時間は手入力ではなく自動計測」方式のために追加。`try_consume_plan_generation()`(2-5)と同じ「行ロック相当の`insert ... on conflict do update`」パターンで、同時アクセスでも実績時間を正しく積み上げる。
+
+```sql
+create or replace function public.increment_actual_minutes(
+  p_learning_plan_id uuid, p_log_date date, p_minutes int
+)
+returns void
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if not exists (select 1 from public.learning_plans
+                  where id = p_learning_plan_id and profile_id = auth.uid()) then
+    raise exception 'learning_plan % does not belong to the caller', p_learning_plan_id;
+  end if;
+
+  insert into public.plan_day_logs (learning_plan_id, log_date, actual_minutes)
+  values (p_learning_plan_id, p_log_date, p_minutes)
+  on conflict (learning_plan_id, log_date)
+  do update set actual_minutes = plan_day_logs.actual_minutes + excluded.actual_minutes;
+end;
+$$;
+```
+
+呼び出し元(学習画面)は`userClient`経由で直接呼ぶ(バックエンドAPIを経由しない)。`profile_id = auth.uid()`の所有権チェックにより、他人の`learning_plan_id`を指定しても加算されない。
+
 ---
 
 ## 3. テーブル定義

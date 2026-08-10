@@ -129,6 +129,7 @@ DDLを読むだけでは伝わらない「検討した代替案」と「採用/�
 25. `data_model_design.md`「5. インデックス」に記載した各インデックス(対象テーブル作成後であればいつでも実行可能)
 26. `log_admin_action()`関数(ADR-14) + 対象テーブル(`data_model_design.md` 2-6に一覧)への監査トリガー適用(各対象テーブル作成後であればいつでも実行可能)
 27. `check_test_completion()`関数 + `learning_records`への`after insert`トリガー(ステップ20の`learning_records`作成後であればいつでも実行可能)
+28. `increment_actual_minutes()`関数(ステップ16の`learning_plans`・ステップ17の`plan_day_logs`作成後であればいつでも実行可能。`frontend_design.md`の自動時間計測機能のために追加)
 
 Supabase CLIを使う場合、`supabase migration new <名前>`でこの順序に沿った複数のマイグレーションファイルを作成していく想定。
 

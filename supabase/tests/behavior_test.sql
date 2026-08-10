@@ -290,9 +290,45 @@ begin
   raise notice 'CHECK 13 PASSED: log_admin_action() handled an id-less table without erroring (row_id=%)', v_row_id;
 end $$;
 
+-- ============================================================
+-- CHECK 14: increment_actual_minutes() atomically upserts and adds on repeat calls
+-- (added for the Expo frontend's auto time-tracking, frontend_design.md §2)
+-- ============================================================
+do $$
+declare
+  v_minutes int;
+begin
+  -- earlier checks left request.jwt.claims pointing at the admin (CHECK 13); reset it to the
+  -- plan's actual owner (user1, set up back in CHECK 7) before calling the ownership-checked function
+  set local request.jwt.claims = '{"sub": "11111111-1111-1111-1111-111111111111", "role": "authenticated"}';
+
+  perform public.increment_actual_minutes('55555555-5555-5555-5555-555555555555', '2026-08-11', 5);
+  perform public.increment_actual_minutes('55555555-5555-5555-5555-555555555555', '2026-08-11', 3);
+
+  select actual_minutes into v_minutes
+  from public.plan_day_logs
+  where learning_plan_id = '55555555-5555-5555-5555-555555555555' and log_date = '2026-08-11';
+
+  if v_minutes <> 8 then
+    raise exception 'CHECK 14 FAILED: actual_minutes = % after two calls (5 + 3), expected 8', v_minutes;
+  end if;
+
+  begin
+    perform public.increment_actual_minutes('99999999-9999-9999-9999-999999999999', '2026-08-11', 5);
+    raise exception 'CHECK 14 FAILED: incrementing a learning_plan owned by someone else was accepted';
+  exception
+    when others then
+      if sqlerrm not like '%does not belong to the caller%' then
+        raise exception 'CHECK 14 FAILED with unexpected error: %', sqlerrm;
+      end if;
+  end;
+
+  raise notice 'CHECK 14 PASSED: increment_actual_minutes() adds atomically and enforces ownership';
+end $$;
+
 do $$
 begin
-  raise notice 'ALL 13 BEHAVIOR CHECKS PASSED';
+  raise notice 'ALL 14 BEHAVIOR CHECKS PASSED';
 end $$;
 
 rollback;
