@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement the 11 end-user MVP screens defined in `docs/frontend_design.md` as an Expo Router app (`app/` at the repo root), against the already-implemented `backend/` (5 REST endpoints) and the verified Supabase schema (`supabase/migrations/`).
+**Goal:** Implement the 11 end-user MVP screens defined in `docs/frontend_design.md` as an Expo Router app in its own `mobile/` subfolder (sibling to `backend/`, since the Ascendo repo root already has its own `package.json`/`supabase/` for the DB layer and can't also be `npx create-expo-app`'s target), against the already-implemented `backend/` (5 REST endpoints) and the verified Supabase schema (`supabase/migrations/`).
 
 **Architecture:** Expo Router file-based routing, `(auth)` and `(app)` route groups per `frontend_design.md`§5. Every screen's business logic that can be expressed as a pure function (Leitner scheduling, plan-JSON parsing, form validation, auth-guard redirect decisions, score aggregation, time-elapsed math) lives in `src/features/*/`-scoped modules with no React/Expo imports, and is TDD'd with Jest exactly like the backend's domain services. Screens themselves (the actual `.tsx` files under `app/`) call these modules and are visually verified by running the app — not covered by automated component tests (see Global Constraints).
 
@@ -16,6 +16,7 @@
 - The 5 backend endpoints are called through a single `src/lib/api-client.ts` wrapper (adds the `Authorization: Bearer <token>` header, parses the `{ error: { code, message } }` envelope from `docs/api_design.md`§2) — no screen calls `fetch()` directly
 - `app.json`: `"scheme": "ascendo"` (deep links), `"owner": "tetsuzi"`, `"slug": "ascendo"` (matches the Expo project already created at expo.dev/accounts/tetsuzi/projects/ascendo)
 - Supabase project connection details (`SUPABASE_URL`, `SUPABASE_ANON_KEY`) are read from `app.config.ts`'s `extra` field, sourced from a gitignored `.env` — never hardcoded
+- **All file paths in this plan (`package.json`, `app/_layout.tsx`, `src/lib/...`, etc.) are relative to `mobile/`, not the Ascendo repo root.** Every task's `Run` commands assume `mobile/` as the working directory (`cd mobile` once, or per-command — same convention `backend_implementation_plan.md` used for `backend/`)
 
 ---
 
@@ -27,15 +28,17 @@
 - Test: `src/lib/__tests__/sanity.test.ts`
 
 **Interfaces:**
-- Produces: a running `npm test` (Jest) and `npx expo start` at the repo root
+- Produces: a running `npm test` (Jest) and `npx expo start` inside `mobile/`
 
-- [ ] **Step 1: Scaffold the Expo project**
+- [ ] **Step 1: Scaffold the Expo project into its own `mobile/` subfolder**
 
-Run (from the repo root):
+Run (from the Ascendo repo root):
 ```bash
+mkdir mobile
+cd mobile
 npx create-expo-app@latest . --template blank-typescript
 ```
-Expected: `package.json`, `app.json`, `App.tsx`, `tsconfig.json` created. Delete the generated `App.tsx` — Expo Router (Step 3) replaces it with `app/_layout.tsx`.
+Expected: `mobile/package.json`, `mobile/app.json`, `mobile/App.tsx`, `mobile/tsconfig.json` created. Delete the generated `App.tsx` — Expo Router (Step 3) replaces it with `app/_layout.tsx`. **All subsequent steps in this plan run with `mobile/` as the working directory.**
 
 - [ ] **Step 2: Install dependencies**
 
