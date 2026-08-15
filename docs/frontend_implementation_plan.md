@@ -45,9 +45,16 @@ Expected: `mobile/package.json`, `mobile/app.json`, `mobile/App.tsx`, `mobile/ts
 Run:
 ```bash
 npx expo install expo-router expo-linking expo-constants expo-status-bar react-native-safe-area-context react-native-screens expo-secure-store expo-av
-npm install @supabase/supabase-js @tanstack/react-query zod
-npm install --save-dev jest-expo @testing-library/react-native react-test-renderer @types/jest
+npm install @supabase/supabase-js @tanstack/react-query zod react-native-url-polyfill dotenv --legacy-peer-deps
+npm install --save-dev jest@^29.7.0 jest-expo @react-native/jest-preset@0.86.2 @testing-library/react-native react-test-renderer@19.2.3 @types/jest --legacy-peer-deps
 ```
+
+**Version-pinning notes (found by actually running this against Expo SDK 57 / React Native 0.86 / React 19.2 — the versions in play when this task was executed; a different SDK generation will need different pins, re-derive them the same way):**
+- `--legacy-peer-deps` is required throughout: `expo-router`'s web-only dependency chain (`vaul`/`@radix-ui/*`) declares a `react-dom` peer this RN-only project doesn't have, and `react-test-renderer`'s exact-version peer on `react` is stricter than what plain `npm install` resolves cleanly
+- `jest` must be pinned to the `^29.x` family — `jest-expo`'s bundled internals (`@jest/globals`, `jest-snapshot`, `jest-environment-jsdom`, all pinned `^29.2.1`) are incompatible with `jest@30`'s `jest-mock` API (`clearMocksOnScope` missing → every test suite fails to even load)
+- `@react-native/jest-preset` must be pinned to **exactly** the installed `react-native` version (`0.86.2` here) — a newer preset version references files (`react-native/src/setup-env.js`) that don't exist at that path in an older `react-native`, and vice versa. Check `node_modules/react-native/package.json`'s `version` before picking this pin
+- `react-test-renderer` must match `jest-expo`'s own pinned version (visible in `node_modules/jest-expo/package.json`'s `dependencies.react-test-renderer`, `19.2.3` here) — not just "some 19.x", since `npm install react-test-renderer` alone resolves to whatever the latest patch is, which can be ahead of what `jest-expo` and the installed `react` both expect
+- If `npm test` fails with an unfamiliar jest-internals error after these installs, check `node_modules/jest-expo/package.json`'s `dependencies`/`peerDependencies` block first — it's the source of truth for what versions the other packages must match
 
 - [ ] **Step 3: Configure Expo Router**
 
@@ -492,9 +499,9 @@ export const supabase = createClient(supabaseUrl as string, supabaseAnonKey as s
 });
 ```
 
-- [ ] **Step 6: Install the polyfill dependency Step 5 relies on**
+- [ ] **Step 6: Confirm the polyfill dependency Step 5 relies on is installed**
 
-Run: `npx expo install react-native-url-polyfill`
+`react-native-url-polyfill` was already added in Task 1 Step 2 (moved forward once this dependency was discovered, so Task 1's single install pass covers everything). Run: `node -e "require.resolve('react-native-url-polyfill/auto')"` — no output/exit code 0 means it's present; otherwise run `npm install react-native-url-polyfill --legacy-peer-deps`.
 (Required because `@supabase/supabase-js` expects a `URL` global that isn't present in the React Native JS runtime without this polyfill.)
 
 - [ ] **Step 7: Run full suite once more**
