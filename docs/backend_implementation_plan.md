@@ -2101,6 +2101,7 @@ git commit -m "feat(backend): wire all 5 endpoints into app.ts, add end-to-end H
 
 `backend/src/server.ts`:
 ```ts
+import 'dotenv/config';
 import { createApp, type AppDeps } from './app.ts';
 import { createJwksVerifier } from './shared/auth/verify.ts';
 import { createUserClient, createServiceClient } from './shared/supabase-client.ts';
@@ -2142,6 +2143,7 @@ app.listen(port, () => {
 });
 ```
 
+> **Bug found post-completion (2026-08-16), fixed retroactively**: the original version of this file didn't have the `import 'dotenv/config'` line — it read `process.env.SUPABASE_URL` etc. directly, which only works if those variables are exported in the shell (exactly how this task's own verification was done, which is why it went unnoticed). A real user following the `.env.example` → `.env` setup instructions hit `missing required environment variable: SUPABASE_URL` even with a correctly filled-in `.env`. Fixed by adding the import above and `dotenv` to `dependencies`; re-verified by starting the server with only a `.env` file (no shell env vars) and confirming `GET /health` responds.
 - [x] **Step 2: Typecheck**
 
 Run: `cd backend && npm run typecheck`
