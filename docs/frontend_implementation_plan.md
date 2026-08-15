@@ -55,6 +55,7 @@ npm install --save-dev jest@^29.7.0 jest-expo @react-native/jest-preset@0.86.2 @
 - `@react-native/jest-preset` must be pinned to **exactly** the installed `react-native` version (`0.86.2` here) — a newer preset version references files (`react-native/src/setup-env.js`) that don't exist at that path in an older `react-native`, and vice versa. Check `node_modules/react-native/package.json`'s `version` before picking this pin
 - `react-test-renderer` must match `jest-expo`'s own pinned version (visible in `node_modules/jest-expo/package.json`'s `dependencies.react-test-renderer`, `19.2.3` here) — not just "some 19.x", since `npm install react-test-renderer` alone resolves to whatever the latest patch is, which can be ahead of what `jest-expo` and the installed `react` both expect
 - If `npm test` fails with an unfamiliar jest-internals error after these installs, check `node_modules/jest-expo/package.json`'s `dependencies`/`peerDependencies` block first — it's the source of truth for what versions the other packages must match
+- The generated `tsconfig.json` (`{ "extends": "expo/tsconfig.base", "compilerOptions": { "strict": true } }`) does not pick up `@types/jest` on its own — `npx tsc --noEmit` fails with `Cannot find name 'test'/'expect'` in every `*.test.ts` file until `"types": ["jest"]` is added to `compilerOptions`
 
 - [ ] **Step 3: Configure Expo Router**
 
