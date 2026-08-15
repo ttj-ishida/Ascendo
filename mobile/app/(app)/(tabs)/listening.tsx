@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Audio } from 'expo-av';
+import { useAudioPlayer } from 'expo-audio';
 import { supabase } from '../../../src/lib/supabase';
 import { useAuth } from '../../../src/features/auth/AuthContext';
 import { useStudyTimer } from '../../../src/features/study-timer/useStudyTimer';
@@ -40,11 +40,13 @@ export default function Listening() {
   useStudyTimer(learningPlanId);
 
   const current = questions[index];
+  // useAudioPlayer must be called unconditionally (Rules of Hooks) — pass null while there's no
+  // audio yet or the current question hasn't loaded; the player just stays idle in that case.
+  const player = useAudioPlayer(current?.listening_passages.audio_url ?? null);
 
-  async function playAudio() {
-    if (!current?.listening_passages.audio_url) return;
-    const { sound } = await Audio.Sound.createAsync({ uri: current.listening_passages.audio_url });
-    await sound.playAsync();
+  function playAudio() {
+    player.seekTo(0);
+    player.play();
   }
 
   async function selectChoice(choice: string) {
