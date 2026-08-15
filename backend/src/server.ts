@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { createApp, type AppDeps } from './app.ts';
 import { createJwksVerifier } from './shared/auth/verify.ts';
 import { createUserClient, createServiceClient } from './shared/supabase-client.ts';
