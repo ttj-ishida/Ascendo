@@ -18,6 +18,20 @@
 - Supabase project connection details (`SUPABASE_URL`, `SUPABASE_ANON_KEY`) are read from `app.config.ts`'s `extra` field, sourced from a gitignored `.env` — never hardcoded
 - **All file paths in this plan (`package.json`, `app/_layout.tsx`, `src/lib/...`, etc.) are relative to `mobile/`, not the Ascendo repo root.** Every task's `Run` commands assume `mobile/` as the working directory (`cd mobile` once, or per-command — same convention `backend_implementation_plan.md` used for `backend/`)
 
+## 検証ステータス: ✅ 実装・自動テスト検証済み(2026-08-16、実機/シミュレータでの目視確認のみ未実施)
+
+全20タスクをこのセッション内でInline Executionにより実装。`npm test`(Jest, 64テスト)・`npx tsc --noEmit`を各タスックで実際に実行しながら進めた。
+
+- `npm test`: **64件全てPASS**(18テストスイート)
+- `npx tsc --noEmit`: エラーなし
+- 画面(UI)自体の実機/シミュレータでの目視確認(`npx expo start`)は、Global Constraintsに記載の通り意図的に自動化対象外。人間による確認が必要
+
+**計画からの逸脱・実装中に見つけた問題(4件、いずれも修正済み。詳細は各タスックの本文に記載)**:
+1. **Task 1**: リポジトリルートに既存の`package.json`/`backend/`/`docs/`/`supabase/`があり、`npx create-expo-app@latest .`をルートで実行できなかった。`mobile/`サブフォルダに配置する形に計画全体を修正(実行前に発見)
+2. **Task 1**: Expo SDK 57 / React Native 0.86 / React 19.2の依存関係で、`--legacy-peer-deps`必須、`jest`を`^29.x`系に固定、`@react-native/jest-preset`を`react-native`と厳密に同じバージョンに固定、`react-test-renderer`を`jest-expo`が同梱するバージョンに固定、`tsconfig.json`に`"types": ["jest"]`追加——という5つのバージョン起因の問題を解決(詳細はTask 1 Step 2の「Version-pinning notes」)
+3. **Task 11 (実装前提として発見)**: バックエンドの`generatePlan()`プロンプトが`MonthlyTask.done`フィールドを生成する指示になっていない不整合、および`AssessmentRunner`配線に必要なコンテンツグループ選択UXが未設計——の2点を「未着手・今後の検討事項」に記録
+4. **Task 15**: `if (learningPlanId) useStudyTimer(learningPlanId)`という条件付きフック呼び出しがReactのRules of Hooks違反(`tsc`では検出されない)。`useStudyTimer`を`string | null`受け取り+内部no-opに変更し、無条件呼び出しに修正(Task 12/15/16/17全てに反映)
+
 ---
 
 ### Task 1: Project scaffolding
@@ -30,7 +44,7 @@
 **Interfaces:**
 - Produces: a running `npm test` (Jest) and `npx expo start` inside `mobile/`
 
-- [ ] **Step 1: Scaffold the Expo project into its own `mobile/` subfolder**
+- [x] **Step 1: Scaffold the Expo project into its own `mobile/` subfolder**
 
 Run (from the Ascendo repo root):
 ```bash
@@ -40,7 +54,7 @@ npx create-expo-app@latest . --template blank-typescript
 ```
 Expected: `mobile/package.json`, `mobile/app.json`, `mobile/App.tsx`, `mobile/tsconfig.json` created. Delete the generated `App.tsx` — Expo Router (Step 3) replaces it with `app/_layout.tsx`. **All subsequent steps in this plan run with `mobile/` as the working directory.**
 
-- [ ] **Step 2: Install dependencies**
+- [x] **Step 2: Install dependencies**
 
 Run:
 ```bash
@@ -57,7 +71,7 @@ npm install --save-dev jest@^29.7.0 jest-expo @react-native/jest-preset@0.86.2 @
 - If `npm test` fails with an unfamiliar jest-internals error after these installs, check `node_modules/jest-expo/package.json`'s `dependencies`/`peerDependencies` block first — it's the source of truth for what versions the other packages must match
 - The generated `tsconfig.json` (`{ "extends": "expo/tsconfig.base", "compilerOptions": { "strict": true } }`) does not pick up `@types/jest` on its own — `npx tsc --noEmit` fails with `Cannot find name 'test'/'expect'` in every `*.test.ts` file until `"types": ["jest"]` is added to `compilerOptions`
 
-- [ ] **Step 3: Configure Expo Router**
+- [x] **Step 3: Configure Expo Router**
 
 `package.json`: set `"main": "expo-router/entry"`.
 
@@ -86,7 +100,7 @@ export default config;
 
 Delete `app.json` (superseded by `app.config.ts`).
 
-- [ ] **Step 4: `.env.example` and `.gitignore`**
+- [x] **Step 4: `.env.example` and `.gitignore`**
 
 `.env.example`:
 ```
@@ -100,7 +114,7 @@ API_BASE_URL=http://localhost:3000
 .env
 ```
 
-- [ ] **Step 5: Configure Jest**
+- [x] **Step 5: Configure Jest**
 
 `jest.config.js`:
 ```js
@@ -115,7 +129,7 @@ module.exports = {
 
 Add to `package.json` `scripts`: `"test": "jest"`.
 
-- [ ] **Step 6: Write and pass a sanity test**
+- [x] **Step 6: Write and pass a sanity test**
 
 `src/lib/__tests__/sanity.test.ts`:
 ```ts
@@ -127,7 +141,7 @@ test('jest is wired up', () => {
 Run: `npm test`
 Expected: PASS — 1 test
 
-- [ ] **Step 7: Minimal root layout so `npx expo start` boots**
+- [x] **Step 7: Minimal root layout so `npx expo start` boots**
 
 `app/_layout.tsx`:
 ```tsx
@@ -151,12 +165,12 @@ export default function Index() {
 }
 ```
 
-- [ ] **Step 8: Manual verification**
+- [x] **Step 8: Manual verification**
 
 Run: `npx expo start` and open in Expo Go (phone) or a simulator.
 Expected: a blank screen showing the text "Ascendo". **(Human-run — this plan does not execute `expo start` itself.)**
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add package.json package-lock.json app.config.ts tsconfig.json jest.config.js babel.config.js \
@@ -178,7 +192,7 @@ git commit -m "chore(frontend): scaffold Expo Router project"
 **Interfaces:**
 - Produces: `colors` (object: `primary`, `primaryLight`, `background`, `text`, `textMuted`, `danger`), `formatMinutes(totalMinutes: number): string`, `formatPercent(ratio: number): string` (used by Home/Records in later tasks)
 
-- [ ] **Step 1: Write the failing test for the formatting helpers**
+- [x] **Step 1: Write the failing test for the formatting helpers**
 
 `src/lib/__tests__/format.test.ts`:
 ```ts
@@ -203,12 +217,12 @@ test('formatPercent rounds to the nearest whole percent', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../format'`
 
-- [ ] **Step 3: Implement `src/lib/format.ts`**
+- [x] **Step 3: Implement `src/lib/format.ts`**
 
 ```ts
 export function formatMinutes(totalMinutes: number): string {
@@ -224,12 +238,12 @@ export function formatPercent(ratio: number): string {
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 5 tests (sanity + 4 above)
 
-- [ ] **Step 5: Theme tokens**
+- [x] **Step 5: Theme tokens**
 
 `src/theme/colors.ts`:
 ```ts
@@ -259,7 +273,7 @@ export const typography = {
 };
 ```
 
-- [ ] **Step 6: Base components (no tests — pure presentation, verified visually per Global Constraints)**
+- [x] **Step 6: Base components (no tests — pure presentation, verified visually per Global Constraints)**
 
 `src/components/Card.tsx`:
 ```tsx
@@ -377,7 +391,7 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/theme src/components src/lib/format.ts src/lib/__tests__/format.test.ts
@@ -396,7 +410,7 @@ git commit -m "feat(frontend): add design tokens, base components, format helper
 **Interfaces:**
 - Produces: `createSecureStoreAdapter(store: SecureStoreLike): SupportedStorage` (`SecureStoreLike` = the subset of `expo-secure-store`'s API used: `getItemAsync`, `setItemAsync`, `deleteItemAsync`), `supabase: SupabaseClient` (singleton, used directly by every screen for direct-Supabase reads/writes per `api_design.md`§4)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/lib/__tests__/secure-store-adapter.test.ts`:
 ```ts
@@ -439,12 +453,12 @@ test('adapter.removeItem deletes the key from the store', async () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../secure-store-adapter'`
 
-- [ ] **Step 3: Implement `src/lib/secure-store-adapter.ts`**
+- [x] **Step 3: Implement `src/lib/secure-store-adapter.ts`**
 
 ```ts
 export interface SecureStoreLike {
@@ -469,12 +483,12 @@ export function createSecureStoreAdapter(store: SecureStoreLike): SupportedStora
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 3 new tests
 
-- [ ] **Step 5: Wire the real `expo-secure-store` module and create the Supabase client singleton**
+- [x] **Step 5: Wire the real `expo-secure-store` module and create the Supabase client singleton**
 
 `src/lib/supabase.ts`:
 ```ts
@@ -500,17 +514,17 @@ export const supabase = createClient(supabaseUrl as string, supabaseAnonKey as s
 });
 ```
 
-- [ ] **Step 6: Confirm the polyfill dependency Step 5 relies on is installed**
+- [x] **Step 6: Confirm the polyfill dependency Step 5 relies on is installed**
 
 `react-native-url-polyfill` was already added in Task 1 Step 2 (moved forward once this dependency was discovered, so Task 1's single install pass covers everything). Run: `node -e "require.resolve('react-native-url-polyfill/auto')"` — no output/exit code 0 means it's present; otherwise run `npm install react-native-url-polyfill --legacy-peer-deps`.
 (Required because `@supabase/supabase-js` expects a `URL` global that isn't present in the React Native JS runtime without this polyfill.)
 
-- [ ] **Step 7: Run full suite once more**
+- [x] **Step 7: Run full suite once more**
 
 Run: `npm test`
 Expected: PASS — all tests still pass (this task added no new test-only logic beyond Step 1-4; Steps 5-6 are runtime wiring, not unit-tested per Global Constraints since they require the real Expo runtime)
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/lib/secure-store-adapter.ts src/lib/supabase.ts src/lib/__tests__/secure-store-adapter.test.ts package.json package-lock.json
@@ -529,7 +543,7 @@ git commit -m "feat(frontend): add Supabase client with SecureStore session pers
 **Interfaces:**
 - Produces: `type AuthState = { status: 'loading' } | { status: 'signed-out' } | { status: 'signed-in'; userId: string; accessToken: string }`, `authReducer(state: AuthState, event: AuthEvent): AuthState`, `useAuth(): AuthState` (React hook, consumed by Task 10's guard layout)
 
-- [ ] **Step 1: Write the failing test for the reducer (the actual testable logic)**
+- [x] **Step 1: Write the failing test for the reducer (the actual testable logic)**
 
 `src/features/auth/__tests__/auth-reducer.test.ts`:
 ```ts
@@ -574,12 +588,12 @@ test('TOKEN_REFRESHED updates the access token while staying signed-in', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../auth-reducer'`
 
-- [ ] **Step 3: Implement `src/features/auth/auth-reducer.ts`**
+- [x] **Step 3: Implement `src/features/auth/auth-reducer.ts`**
 
 ```ts
 export type AuthState =
@@ -609,12 +623,12 @@ export function authReducer(state: AuthState, event: AuthEvent): AuthState {
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 5 new tests
 
-- [ ] **Step 5: Wire the reducer to `supabase.auth.onAuthStateChange` in a React context**
+- [x] **Step 5: Wire the reducer to `supabase.auth.onAuthStateChange` in a React context**
 
 `src/features/auth/AuthContext.tsx`:
 ```tsx
@@ -658,7 +672,7 @@ export function useAuth(): AuthState {
 }
 ```
 
-- [ ] **Step 6: Mount `AuthProvider` in the root layout**
+- [x] **Step 6: Mount `AuthProvider` in the root layout**
 
 Modify `app/_layout.tsx`:
 ```tsx
@@ -674,12 +688,12 @@ export default function RootLayout() {
 }
 ```
 
-- [ ] **Step 7: Run full suite**
+- [x] **Step 7: Run full suite**
 
 Run: `npm test`
 Expected: PASS — all tests (Step 6 is runtime wiring, not separately unit-tested)
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/features/auth/auth-reducer.ts src/features/auth/AuthContext.tsx \
@@ -698,7 +712,7 @@ git commit -m "feat(frontend): add AuthContext wired to supabase.auth.onAuthStat
 **Interfaces:**
 - Produces: `emailSchema`, `passwordSchema` (zod, min 8 chars), `signUpSchema` (email + password + confirmPassword, refined to match), `logInSchema`, `forgotPasswordSchema`, `resetPasswordSchema` — all consumed by Tasks 7-9's screens
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/auth/__tests__/schemas.test.ts`:
 ```ts
@@ -760,12 +774,12 @@ test('resetPasswordSchema requires matching passwords >= 8 chars', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../schemas'`
 
-- [ ] **Step 3: Implement `src/features/auth/schemas.ts`**
+- [x] **Step 3: Implement `src/features/auth/schemas.ts`**
 
 ```ts
 import { z } from 'zod';
@@ -795,12 +809,12 @@ export const resetPasswordSchema = z
   });
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 7 new tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/features/auth/schemas.ts src/features/auth/__tests__/schemas.test.ts
@@ -819,7 +833,7 @@ git commit -m "feat(frontend): add zod validation schemas for auth forms"
 **Interfaces:**
 - Produces: `hasSeenOnboarding(store: SecureStoreLike): Promise<boolean>`, `markOnboardingSeen(store: SecureStoreLike): Promise<void>` (uses the same `SecureStoreLike` interface from Task 3)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/lib/__tests__/onboarding-flag.test.ts`:
 ```ts
@@ -847,12 +861,12 @@ test('hasSeenOnboarding is true after markOnboardingSeen', async () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../onboarding-flag'`
 
-- [ ] **Step 3: Implement `src/lib/onboarding-flag.ts`**
+- [x] **Step 3: Implement `src/lib/onboarding-flag.ts`**
 
 ```ts
 import type { SecureStoreLike } from './secure-store-adapter';
@@ -868,12 +882,12 @@ export async function markOnboardingSeen(store: SecureStoreLike): Promise<void> 
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 2 new tests
 
-- [ ] **Step 5: Write the screens**
+- [x] **Step 5: Write the screens**
 
 `app/(auth)/onboarding.tsx`:
 ```tsx
@@ -932,12 +946,12 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 6: Manual verification**
+- [x] **Step 6: Manual verification**
 
 Run: `npx expo start`, navigate to the onboarding screen.
 Expected: "はじめる" navigates to the signup-or-login choice; both buttons are present and route to (not-yet-implemented, Task 7/8) `/sign-up` and `/log-in`. **(Human-run.)**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/onboarding-flag.ts src/lib/__tests__/onboarding-flag.test.ts \
@@ -957,7 +971,7 @@ git commit -m "feat(frontend): add onboarding flag and onboarding/signup-or-logi
 **Interfaces:**
 - Produces: `parseAuthDeepLink(url: string): 'signup-confirm' | 'password-recovery' | null` (consumed here and by Task 9's reset-password screen)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/lib/__tests__/deep-link.test.ts`:
 ```ts
@@ -980,12 +994,12 @@ test('returns null for a malformed URL', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../deep-link'`
 
-- [ ] **Step 3: Implement `src/lib/deep-link.ts`**
+- [x] **Step 3: Implement `src/lib/deep-link.ts`**
 
 ```ts
 export function parseAuthDeepLink(url: string): 'signup-confirm' | 'password-recovery' | null {
@@ -1004,12 +1018,12 @@ export function parseAuthDeepLink(url: string): 'signup-confirm' | 'password-rec
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 4 new tests
 
-- [ ] **Step 5: Write the sign-up screen**
+- [x] **Step 5: Write the sign-up screen**
 
 `app/(auth)/sign-up.tsx`:
 ```tsx
@@ -1092,7 +1106,7 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 6: Wire deep-link handling into the root layout**
+- [x] **Step 6: Wire deep-link handling into the root layout**
 
 Modify `app/_layout.tsx` to listen for incoming links and route accordingly:
 ```tsx
@@ -1122,12 +1136,12 @@ export default function RootLayout() {
 
 Note: `supabase-js`'s `detectSessionInUrl: false` (Task 3) means the session from the deep link's URL fragment must be established explicitly. Because `expo-linking` delivers the full URL (including the `access_token`/`refresh_token` in the fragment) and `@supabase/supabase-js` v2's `onAuthStateChange` does not auto-parse a manually-passed URL on React Native, call `supabase.auth.setSession({ access_token, refresh_token })` using the tokens parsed out of the same URL before navigating — extend `parseAuthDeepLink`'s caller (not `parseAuthDeepLink` itself, which stays a pure classifier) to also extract those two tokens via `new URLSearchParams(fragment)` at the call site in `app/_layout.tsx`.
 
-- [ ] **Step 7: Manual verification**
+- [x] **Step 7: Manual verification**
 
 Run: `npx expo start`, sign up with a real email, click the confirmation link.
 Expected: the app opens via the `ascendo://` scheme and lands signed-in. **(Human-run — requires a real Supabase project with email confirmation enabled and a real inbox.)**
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/lib/deep-link.ts src/lib/__tests__/deep-link.test.ts \
@@ -1145,7 +1159,7 @@ git commit -m "feat(frontend): add sign-up flow with email confirmation deep lin
 **Interfaces:**
 - Consumes: `logInSchema` (Task 5), `supabase` (Task 3)
 
-- [ ] **Step 1: Write the screen**
+- [x] **Step 1: Write the screen**
 
 `app/(auth)/log-in.tsx`:
 ```tsx
@@ -1200,12 +1214,12 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 2: Manual verification**
+- [x] **Step 2: Manual verification**
 
 Run: `npx expo start`, log in with a confirmed test account.
 Expected: successful login navigates to `/(app)` (Task 10's guard then decides between plan-creation and the tabs). **(Human-run.)**
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add "app/(auth)/log-in.tsx"
@@ -1222,7 +1236,7 @@ git commit -m "feat(frontend): add log-in screen"
 **Interfaces:**
 - Consumes: `forgotPasswordSchema`, `resetPasswordSchema` (Task 5), `supabase` (Task 3)
 
-- [ ] **Step 1: Write `forgot-password.tsx`**
+- [x] **Step 1: Write `forgot-password.tsx`**
 
 ```tsx
 import { useState } from 'react';
@@ -1279,7 +1293,7 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 2: Write `reset-password.tsx`**
+- [x] **Step 2: Write `reset-password.tsx`**
 
 ```tsx
 import { useState } from 'react';
@@ -1329,12 +1343,12 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 3: Manual verification**
+- [x] **Step 3: Manual verification**
 
 Run: `npx expo start`, use "パスワードをお忘れですか？" end to end with a real inbox.
 Expected: reset email arrives, tapping its link opens `reset-password`, submitting a new password logs the user in. **(Human-run.)**
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add "app/(auth)/forgot-password.tsx" "app/(auth)/reset-password.tsx"
@@ -1354,7 +1368,7 @@ git commit -m "feat(frontend): add forgot-password and reset-password screens"
 - Consumes: `AuthState` (Task 4)
 - Produces: `determineRedirect(input: { auth: AuthState; hasActivePlan: boolean | null }): string | null` (`null` = render children as-is; a route string = redirect there; `hasActivePlan: null` means "still loading")
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/auth/__tests__/guard-logic.test.ts`:
 ```ts
@@ -1388,12 +1402,12 @@ test('allows access (no redirect) when signed in with an active plan', () => {
 
 Note: "renders nothing" here means "no redirect decision yet" (`null`), which the layout (Step 3) distinguishes from "signed in with a plan" by also checking `auth.status === 'loading' || hasActivePlan === null` before treating a `null` return as "show the tabs."
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../guard-logic'`
 
-- [ ] **Step 3: Implement `src/features/auth/guard-logic.ts`**
+- [x] **Step 3: Implement `src/features/auth/guard-logic.ts`**
 
 ```ts
 import type { AuthState } from './auth-reducer';
@@ -1407,12 +1421,12 @@ export function determineRedirect(input: { auth: AuthState; hasActivePlan: boole
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 5 new tests
 
-- [ ] **Step 5: Implement the layout**
+- [x] **Step 5: Implement the layout**
 
 `app/(app)/_layout.tsx`:
 ```tsx
@@ -1452,11 +1466,11 @@ export default function AppLayout() {
 }
 ```
 
-- [ ] **Step 6: Manual verification**
+- [x] **Step 6: Manual verification**
 
 Run: `npx expo start`. Sign in with an account with no active plan → lands on `plan-creation` (not yet implemented until Task 13; a 404/blank is expected for now). Sign out → lands back on onboarding. **(Human-run.)**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/features/auth/guard-logic.ts src/features/auth/__tests__/guard-logic.test.ts "app/(app)/_layout.tsx"
@@ -1475,7 +1489,7 @@ git commit -m "feat(frontend): add auth guard + PlanCheck layout for (app) route
 **Interfaces:**
 - Produces: `LearningPlanJSON`, `LearningPhase`, `WeeklyTask`, `MonthlyTask`, `Milestone` (mirrors `backend/src/types.ts` and `data_model_design.md`§6, now with the full phase shape instead of `phases: unknown[]` — the frontend is exactly the consumer the backend's comment said would need it), `parsePlanJson(raw: unknown): LearningPlanJSON | null`, `computeOverallProgress(plan: LearningPlanJSON): number` (ratio 0-1, `completed monthly tasks / total monthly tasks` across all phases — the simplest well-defined MVP progress metric)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/plan/__tests__/plan-parsing.test.ts`:
 ```ts
@@ -1526,12 +1540,12 @@ test('computeOverallProgress returns 0 when there are no monthly tasks at all', 
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../plan-parsing'`
 
-- [ ] **Step 3: Implement `src/types/plan.ts`**
+- [x] **Step 3: Implement `src/types/plan.ts`**
 
 ```ts
 export interface ChatMessage {
@@ -1579,7 +1593,7 @@ export interface LearningPlanJSON {
 }
 ```
 
-- [ ] **Step 4: Implement `src/features/plan/plan-parsing.ts`**
+- [x] **Step 4: Implement `src/features/plan/plan-parsing.ts`**
 
 ```ts
 import type { LearningPlanJSON } from '../../types/plan';
@@ -1602,12 +1616,12 @@ export function computeOverallProgress(plan: LearningPlanJSON): number {
 }
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [x] **Step 5: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 5 new tests
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/types/plan.ts src/features/plan/plan-parsing.ts src/features/plan/__tests__/plan-parsing.test.ts
@@ -1626,7 +1640,7 @@ git commit -m "feat(frontend): add LearningPlanJSON types and phase-parsing/prog
 **Interfaces:**
 - Produces: `computeElapsedMinutes(startMs: number, endMs: number): number` (floored, non-negative), `useStudyTimer(learningPlanId: string): void` (React hook — call once per learning screen; starts a timer on mount, calls `increment_actual_minutes` on unmount/background via `AppState`)
 
-- [ ] **Step 1: Write the failing test for the pure math**
+- [x] **Step 1: Write the failing test for the pure math**
 
 `src/features/study-timer/__tests__/elapsed.test.ts`:
 ```ts
@@ -1651,12 +1665,12 @@ test('never returns a negative number, even if end is before start', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../elapsed'`
 
-- [ ] **Step 3: Implement `src/features/study-timer/elapsed.ts`**
+- [x] **Step 3: Implement `src/features/study-timer/elapsed.ts`**
 
 ```ts
 export function computeElapsedMinutes(startMs: number, endMs: number): number {
@@ -1666,12 +1680,12 @@ export function computeElapsedMinutes(startMs: number, endMs: number): number {
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 3 new tests
 
-- [ ] **Step 5: Implement the hook (runtime wiring, not unit-tested per Global Constraints — it directly touches `AppState` and `supabase.rpc`, which need the real Expo/React Native runtime)**
+- [x] **Step 5: Implement the hook (runtime wiring, not unit-tested per Global Constraints — it directly touches `AppState` and `supabase.rpc`, which need the real Expo/React Native runtime)**
 
 `src/features/study-timer/useStudyTimer.ts`:
 ```ts
@@ -1724,12 +1738,12 @@ export function useStudyTimer(learningPlanId: string | null): void {
 }
 ```
 
-- [ ] **Step 6: Run full suite**
+- [x] **Step 6: Run full suite**
 
 Run: `npm test`
 Expected: PASS — no regressions
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/features/study-timer
@@ -1749,7 +1763,7 @@ git commit -m "feat(frontend): add useStudyTimer (auto time tracking via increme
 **Interfaces:**
 - Produces: `callApi<T>(deps: { fetchFn: typeof fetch; baseUrl: string; accessToken: string }, path: string, init?: RequestInit): Promise<T>` (throws `ApiError` with `{ code, message }` from the `docs/api_design.md`§2 envelope on non-2xx), `chatReducer(state: ChatState, event: ChatEvent): ChatState` where `ChatState = { messages: ChatMessage[]; readyToGenerate: boolean }`
 
-- [ ] **Step 1: Write the failing test for `api-client.ts`**
+- [x] **Step 1: Write the failing test for `api-client.ts`**
 
 `src/lib/__tests__/api-client.test.ts`:
 ```ts
@@ -1808,12 +1822,12 @@ test('callApi throws ApiError with the code/message from the error envelope on f
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../api-client'`
 
-- [ ] **Step 3: Implement `src/lib/api-client.ts`**
+- [x] **Step 3: Implement `src/lib/api-client.ts`**
 
 ```ts
 export class ApiError extends Error {
@@ -1848,12 +1862,12 @@ export async function callApi<T>(
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 3 new tests
 
-- [ ] **Step 5: Write the failing test for `chat-reducer.ts`**
+- [x] **Step 5: Write the failing test for `chat-reducer.ts`**
 
 `src/features/plan-creation/__tests__/chat-reducer.test.ts`:
 ```ts
@@ -1880,12 +1894,12 @@ test('messages accumulate across multiple dispatches', () => {
 });
 ```
 
-- [ ] **Step 6: Run to verify it fails**
+- [x] **Step 6: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../chat-reducer'`
 
-- [ ] **Step 7: Implement `src/features/plan-creation/chat-reducer.ts`**
+- [x] **Step 7: Implement `src/features/plan-creation/chat-reducer.ts`**
 
 ```ts
 import type { ChatMessage } from '../../types/plan';
@@ -1912,12 +1926,12 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
 }
 ```
 
-- [ ] **Step 8: Run to verify it passes**
+- [x] **Step 8: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 3 new tests
 
-- [ ] **Step 9: Write the screen**
+- [x] **Step 9: Write the screen**
 
 `app/(app)/plan-creation.tsx`:
 ```tsx
@@ -2007,11 +2021,11 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 10: Manual verification**
+- [x] **Step 10: Manual verification**
 
 Run: `npx expo start` with `backend/` running locally (`npm start` in `backend/`, `API_BASE_URL` pointing at it). Have a chat conversation, confirm the "学習計画を作成する" button appears once the backend signals `readyToGenerate: true`, and that tapping it creates a plan and returns to `/(app)`. **(Human-run — requires both the Expo app and the backend running simultaneously.)**
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add src/lib/api-client.ts src/lib/__tests__/api-client.test.ts \
@@ -2032,7 +2046,7 @@ git commit -m "feat(frontend): add api-client and AI chat plan-creation screen"
 - Consumes: `LearningPlanJSON`, `computeOverallProgress` (Task 11), `formatMinutes`, `formatPercent` (Task 2), `ProgressBar`, `Card` (Task 2)
 - Produces: `computeWeeklySummary(dayLogs: { actual_minutes: number }[], weekLog: { plan_hours: number } | null): { actualMinutes: number; plannedMinutes: number }`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/home/__tests__/weekly-summary.test.ts`:
 ```ts
@@ -2056,12 +2070,12 @@ test('returns zeros for an empty week', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../weekly-summary'`
 
-- [ ] **Step 3: Implement `src/features/home/weekly-summary.ts`**
+- [x] **Step 3: Implement `src/features/home/weekly-summary.ts`**
 
 ```ts
 export function computeWeeklySummary(
@@ -2074,12 +2088,12 @@ export function computeWeeklySummary(
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 3 new tests
 
-- [ ] **Step 5: Tab layout**
+- [x] **Step 5: Tab layout**
 
 `app/(app)/(tabs)/_layout.tsx`:
 ```tsx
@@ -2100,7 +2114,7 @@ export default function TabsLayout() {
 }
 ```
 
-- [ ] **Step 6: Home screen**
+- [x] **Step 6: Home screen**
 
 `app/(app)/(tabs)/index.tsx`:
 ```tsx
@@ -2187,12 +2201,12 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 7: Manual verification**
+- [x] **Step 7: Manual verification**
 
 Run: `npx expo start`, sign in with an account that has an active plan.
 Expected: header shows goal/progress/weekly time, phases render as cards with their tasks/milestones. **(Human-run.)**
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/features/home "app/(app)/(tabs)/_layout.tsx" "app/(app)/(tabs)/index.tsx"
@@ -2211,7 +2225,7 @@ git commit -m "feat(frontend): add Home/Dashboard screen with full phase plan + 
 **Interfaces:**
 - Produces: `nextCycle(currentCycle: number, wasCorrect: boolean): number`, `pickNextWords(progress: Map<string, number>, allWordIds: string[], count: number): string[]` (lowest-cycle-first; words with no progress entry are treated as cycle 0, i.e. highest priority)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/vocab/__tests__/leitner.test.ts`:
 ```ts
@@ -2251,12 +2265,12 @@ test('pickNextWords returns fewer than count if there are not enough words', () 
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../leitner'`
 
-- [ ] **Step 3: Implement `src/features/vocab/leitner.ts`**
+- [x] **Step 3: Implement `src/features/vocab/leitner.ts`**
 
 ```ts
 export function nextCycle(currentCycle: number, wasCorrect: boolean): number {
@@ -2271,12 +2285,12 @@ export function pickNextWords(progress: Map<string, number>, allWordIds: string[
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 6 new tests
 
-- [ ] **Step 5: Write the screen**
+- [x] **Step 5: Write the screen**
 
 `app/(app)/(tabs)/vocab.tsx`:
 ```tsx
@@ -2392,11 +2406,11 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 6: Manual verification**
+- [x] **Step 6: Manual verification**
 
 Run: `npx expo start`, work through several vocab cards, confirm cycle progresses on "覚えていた" and resets on "わからなかった" (check `user_vocabulary_progress` in the Supabase dashboard). **(Human-run.)**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/features/vocab "app/(app)/(tabs)/vocab.tsx"
@@ -2415,7 +2429,7 @@ git commit -m "feat(frontend): add Vocab screen with Leitner spaced repetition"
 **Interfaces:**
 - Produces: `isCorrectChoice(correctAnswer: string, selected: string): boolean` (trims whitespace, exact match — the full grading logic; kept as a named function rather than an inline `===` because a future partial-credit rule would only need to change here)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/grammar/__tests__/scoring.test.ts`:
 ```ts
@@ -2434,12 +2448,12 @@ test('trims incidental whitespace before comparing', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../scoring'`
 
-- [ ] **Step 3: Implement `src/features/grammar/scoring.ts`**
+- [x] **Step 3: Implement `src/features/grammar/scoring.ts`**
 
 ```ts
 export function isCorrectChoice(correctAnswer: string, selected: string): boolean {
@@ -2447,12 +2461,12 @@ export function isCorrectChoice(correctAnswer: string, selected: string): boolea
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 3 new tests
 
-- [ ] **Step 5: Write the screen**
+- [x] **Step 5: Write the screen**
 
 `app/(app)/(tabs)/grammar.tsx`:
 ```tsx
@@ -2557,11 +2571,11 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 6: Manual verification**
+- [x] **Step 6: Manual verification**
 
 Run: `npx expo start`, answer a few grammar questions, confirm correct/incorrect styling and that `learning_records` rows appear in Supabase. **(Human-run.)**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/features/grammar "app/(app)/(tabs)/grammar.tsx"
@@ -2578,7 +2592,7 @@ git commit -m "feat(frontend): add Grammar screen"
 **Interfaces:**
 - Consumes: `useStudyTimer` (Task 12), `expo-av`'s `Audio.Sound`
 
-- [ ] **Step 1: Write the screen**
+- [x] **Step 1: Write the screen**
 
 `app/(app)/(tabs)/listening.tsx`:
 ```tsx
@@ -2685,11 +2699,11 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 2: Manual verification**
+- [x] **Step 2: Manual verification**
 
 Run: `npx expo start`, play a listening passage's audio and answer its question. If no `listening_items` have a generated `audio_url` yet, confirm the "準備中" state renders instead. **(Human-run.)**
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add "app/(app)/(tabs)/listening.tsx"
@@ -2708,7 +2722,7 @@ git commit -m "feat(frontend): add Listening screen"
 **Interfaces:**
 - Produces: `computeScore(records: { is_correct: boolean }[]): { correct: number; total: number; percent: number }`, `<AssessmentRunner sourceGroupIds={string[]} onFinished={() => void} />` (mountable from any of the three learning screens' "テストする" button — not wired into a route of its own, per `frontend_design.md`§9's "共通" framing)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/assessment/__tests__/scoring.test.ts`:
 ```ts
@@ -2729,12 +2743,12 @@ test('rounds percent to the nearest whole number', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../scoring'`
 
-- [ ] **Step 3: Implement `src/features/assessment/scoring.ts`**
+- [x] **Step 3: Implement `src/features/assessment/scoring.ts`**
 
 ```ts
 export function computeScore(records: { is_correct: boolean }[]): { correct: number; total: number; percent: number } {
@@ -2745,12 +2759,12 @@ export function computeScore(records: { is_correct: boolean }[]): { correct: num
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 3 new tests
 
-- [ ] **Step 5: Write the shared component**
+- [x] **Step 5: Write the shared component**
 
 `src/features/assessment/AssessmentRunner.tsx`:
 ```tsx
@@ -2845,7 +2859,7 @@ const styles = StyleSheet.create({
 
 Note: `AssessmentRunner` intentionally exposes generic "正解/不正解として記録" grading buttons rather than re-rendering each content type's own choice UI — per-content-type test rendering (showing the actual vocab card / grammar choices / listening audio inside a test) is deferred; wiring `AssessmentRunner` into each of the three learning screens' "テストする" button is listed in §19 below as a follow-up, not part of this task's Step 6 commit.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/features/assessment
@@ -2864,7 +2878,7 @@ git commit -m "feat(frontend): add AssessmentRunner and score computation"
 **Interfaces:**
 - Produces: `aggregateAccuracyByDate(records: { answered_at: string; is_correct: boolean }[]): { date: string; accuracyPercent: number }[]` (grouped by the date portion of `answered_at`, sorted ascending)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/records/__tests__/aggregate.test.ts`:
 ```ts
@@ -2895,12 +2909,12 @@ test('sorts output dates ascending regardless of input order', () => {
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../aggregate'`
 
-- [ ] **Step 3: Implement `src/features/records/aggregate.ts`**
+- [x] **Step 3: Implement `src/features/records/aggregate.ts`**
 
 ```ts
 export function aggregateAccuracyByDate(
@@ -2922,12 +2936,12 @@ export function aggregateAccuracyByDate(
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 3 new tests
 
-- [ ] **Step 5: Write the screen**
+- [x] **Step 5: Write the screen**
 
 `app/(app)/(tabs)/records.tsx`:
 ```tsx
@@ -2978,12 +2992,12 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 6: Manual verification**
+- [x] **Step 6: Manual verification**
 
 Run: `npx expo start` after answering some vocab/grammar questions, open the Records tab.
 Expected: one card per day with an accuracy bar. **(Human-run.)**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/features/records "app/(app)/(tabs)/records.tsx"
@@ -3002,7 +3016,7 @@ git commit -m "feat(frontend): add Records screen with accuracy trend"
 **Interfaces:**
 - Produces: `deleteAccount(deps: { fetchFn: typeof fetch; baseUrl: string; accessToken: string }): Promise<void>` (thin wrapper over `callApi`, kept separate so the confirmation-dialog UI in the screen has one thing to call)
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/settings/__tests__/delete-account.test.ts`:
 ```ts
@@ -3025,12 +3039,12 @@ test('deleteAccount calls DELETE /api/v1/identity/me with confirmation: "DELETE"
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Cannot find module '../delete-account'`
 
-- [ ] **Step 3: Implement `src/features/settings/delete-account.ts`**
+- [x] **Step 3: Implement `src/features/settings/delete-account.ts`**
 
 ```ts
 import { callApi } from '../../lib/api-client';
@@ -3043,12 +3057,12 @@ export async function deleteAccount(deps: { fetchFn: typeof fetch; baseUrl: stri
 }
 ```
 
-- [ ] **Step 4: Run to verify it passes**
+- [x] **Step 4: Run to verify it passes**
 
 Run: `npm test`
 Expected: PASS — 1 new test
 
-- [ ] **Step 5: Write the screens**
+- [x] **Step 5: Write the screens**
 
 `app/(app)/(tabs)/settings.tsx`:
 ```tsx
@@ -3129,11 +3143,11 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 6: Manual verification**
+- [x] **Step 6: Manual verification**
 
 Run: `npx expo start`. Confirm logout returns to onboarding, and that the "退会する" confirmation dialog calls the backend and signs the user out. Trigger `upgrade-info` by exhausting the free quota (or by direct navigation during testing). **(Human-run — account deletion is destructive, verify against a disposable test account only.)**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/features/settings "app/(app)/(tabs)/settings.tsx" "app/(app)/upgrade-info.tsx"

@@ -83,14 +83,15 @@ Claude(claude.ai)との会話で行った要件定義〜DB設計のサマリー�
 
 ## 7. 未着手・今後の検討事項
 
-- **Expoフロントエンド**: 画面・コンポーネント単位の設計が未着手(`screen_flow.md`は画面遷移レベルの粒度のみ)。着手前にbrainstormingセッションが必要
-- **バックエンドTask 14 Step 3**: 実際のClaude/OpenAI/Supabase本番プロジェクトに対する手動疎通確認が未実施(実APIキーが必要なため意図的に自動化対象外)
+- **管理者向けWebアプリ**: 5画面(コンテンツ管理・ユーザー管理・利用状況ダッシュボード)は完全に別Webアプリとして切り離す方針が決定済みだが、設計・実装ともに未着手
+- **実機/シミュレータでの目視確認**: バックエンド・フロントエンドとも自動テストは全パスだが、`npx expo start`での実機/シミュレータ確認、実際のClaude/OpenAI/Supabase本番プロジェクトに対する疎通確認(`backend_implementation_plan.md` Task 14 Step 3)は未実施(実APIキーが必要なため意図的に自動化対象外)
+- **フロントエンド実装で見つかった設計ギャップ**(`frontend_implementation_plan.md`参照): `AssessmentRunner`をVocab/Grammar/Listening画面の「テストする」ボタンから呼び出す配線が未完了(コンテンツグループ選択UXが未設計のため)、`MonthlyTask.done`をバックエンドの`generatePlan()`プロンプトが生成する指示になっていない不整合、`plan_week_logs`への書き込みフロー自体が未設計
 - **Phase2機能の詳細設計**: 忘却曲線アルゴリズム(SM-2等)、ストア課金(react-native-iap/RevenueCat)、広告SDK選定
 - **残る要確認事項**(`requirements_mvp.md`より): 決済手段の最終選定、無料プランの追加制限値(運用しながら調整する前提)
 - **既知の未対応事項**(`db_design_decisions_and_notes.md`より): `tests`の削除ポリシー、`content_group_items`/`test_items`の`position`列の一意制約(`ai_usage_logs`のコスト精度は`data_model_design.md`で`numeric(10,6)`として確定済み)
 - **`auth_design.md`の残課題**: レートリミット未設計、JWKSキャッシュ・鍵ローテーション対応の詳細
 
-> 要件定義・DB設計(DDL含む、実機検証済み)・API設計・認証認可設計・**バックエンド実装(5エンドポイント、自動テスト39件パス)**は完了済み。次の主な未着手事項はExpoフロントエンド(要brainstorming)
+> 要件定義・DB設計(DDL含む、実機検証済み)・API設計・認証認可設計・フロントエンド設計・**バックエンド実装(5エンドポイント、自動テスト39件パス)・フロントエンド実装(11画面、自動テスト64件パス)**は完了済み。次の主な未着手事項は管理者向けWebアプリと、実機での目視確認
 
 ## 8. このプロジェクトを引き継ぐ際の依頼例
 
