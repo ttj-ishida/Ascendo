@@ -83,8 +83,9 @@ Claude(claude.ai)との会話で行った要件定義〜DB設計のサマリー�
 
 ## 7. 未着手・今後の検討事項
 
-- **管理者向けWebアプリ**: 5画面(コンテンツ管理・ユーザー管理・利用状況ダッシュボード)は完全に別Webアプリとして切り離す方針が決定済みだが、設計・実装ともに未着手
-- **実機/シミュレータでの目視確認**: バックエンド・フロントエンドとも自動テストは全パスだが、`npx expo start`での実機/シミュレータ確認、実際のClaude/OpenAI/Supabase本番プロジェクトに対する疎通確認(`backend_implementation_plan.md` Task 14 Step 3)は未実施(実APIキーが必要なため意図的に自動化対象外)
+- **管理者向けWebアプリ**: 5画面(コンテンツ管理・ユーザー管理・利用状況ダッシュボード)は完全に別Webアプリとして切り離す方針が決定済みだが、設計・実装ともに未着手。現状、学習コンテンツ(単語・文法・リスニング)をアプリのUIから登録する手段がなく、Supabase Table Editor/SQL Editorでの手動INSERTのみが投入経路
+- **実機/シミュレータでの目視確認**: バックエンドの起動確認(ダミーキーでの`/health`応答)・フロントエンドのビルド確認(Expo Web、`npx expo start --web`でのバンドル成功)はユーザー自身の端末で実施済み。ただし実際のログイン・AIチャットでの計画生成・学習コンテンツの動作確認(実キー・Expo Go/エミュレータでの実機確認)は未実施
+- **TODO: Expo Web版でのログイン等の動作確認**: `src/lib/secure-store-adapter.ts`が`expo-secure-store`(モバイルのみ対応)固定のため、Web版はログイン画面より先に進めない。`Platform.OS === 'web'`で分岐し`localStorage`等を使う実装が必要(詳細は`frontend_implementation_plan.md`末尾)。優先度は低い(Ascendoはモバイルアプリとして設計)
 - **フロントエンド実装で見つかった設計ギャップ**(`frontend_implementation_plan.md`参照): `AssessmentRunner`をVocab/Grammar/Listening画面の「テストする」ボタンから呼び出す配線が未完了(コンテンツグループ選択UXが未設計のため)、`MonthlyTask.done`をバックエンドの`generatePlan()`プロンプトが生成する指示になっていない不整合、`plan_week_logs`への書き込みフロー自体が未設計
 - **Phase2機能の詳細設計**: 忘却曲線アルゴリズム(SM-2等)、ストア課金(react-native-iap/RevenueCat)、広告SDK選定
 - **残る要確認事項**(`requirements_mvp.md`より): 決済手段の最終選定、無料プランの追加制限値(運用しながら調整する前提)
