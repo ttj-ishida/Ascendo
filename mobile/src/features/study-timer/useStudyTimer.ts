@@ -17,12 +17,17 @@ async function flush(learningPlanId: string, startedAtMs: number) {
   });
 }
 
-/** Call once per learning screen (Vocab/Grammar/Listening). Tracks active time and flushes it to
- * plan_day_logs.actual_minutes via increment_actual_minutes() on unmount or app backgrounding. */
-export function useStudyTimer(learningPlanId: string): void {
+/** Call once per learning screen (Vocab/Grammar/Listening), unconditionally — pass `null` while
+ * the active learning_plan hasn't loaded yet; the hook itself no-ops until a real id is available.
+ * (Calling this hook conditionally, e.g. `if (id) useStudyTimer(id)`, breaks React's Rules of
+ * Hooks: the hook would be called on some renders and not others, changing call order.)
+ * Tracks active time and flushes it to plan_day_logs.actual_minutes via increment_actual_minutes()
+ * on unmount or app backgrounding. */
+export function useStudyTimer(learningPlanId: string | null): void {
   const startedAtRef = useRef(Date.now());
 
   useEffect(() => {
+    if (!learningPlanId) return;
     startedAtRef.current = Date.now();
 
     const subscription = AppState.addEventListener('change', (state) => {
