@@ -31,6 +31,8 @@
 2. **Task 1**: Expo SDK 57 / React Native 0.86 / React 19.2の依存関係で、`--legacy-peer-deps`必須、`jest`を`^29.x`系に固定、`@react-native/jest-preset`を`react-native`と厳密に同じバージョンに固定、`react-test-renderer`を`jest-expo`が同梱するバージョンに固定、`tsconfig.json`に`"types": ["jest"]`追加——という5つのバージョン起因の問題を解決(詳細はTask 1 Step 2の「Version-pinning notes」)
 3. **Task 11 (実装前提として発見)**: バックエンドの`generatePlan()`プロンプトが`MonthlyTask.done`フィールドを生成する指示になっていない不整合、および`AssessmentRunner`配線に必要なコンテンツグループ選択UXが未設計——の2点を「未着手・今後の検討事項」に記録
 4. **Task 15**: `if (learningPlanId) useStudyTimer(learningPlanId)`という条件付きフック呼び出しがReactのRules of Hooks違反(`tsc`では検出されない)。`useStudyTimer`を`string | null`受け取り+内部no-opに変更し、無条件呼び出しに修正(Task 12/15/16/17全てに反映)
+5. **計画外(検証セッション中)**: `npx expo start --web`での動作確認用に`react-dom`/`react-native-web`を追加インストールしたが、その場でコミット・pushし忘れていた。ユーザーが手順に従って`git clone`→`npm install`したところ`Unable to resolve "react-native-web/dist/index"`で失敗し、この欠落が発覚(該当コミットで修正済み)。**教訓**: 検証セッション中に加えた`package.json`変更は、検証が終わった直後にその場でコミットすること
+6. **既知の制約(Web限定)**: `expo-secure-store`はWebプラットフォーム非対応のため、`--web`実行時はアプリ起動直後に`ExpoSecureStore.default.getValueWithKeyAsync is not a function`でクラッシュする。Ascendoはモバイルアプリとして設計されているため未対応のまま(iOS/Android/Expo Goでは問題なし)。Web版でもログイン等を動かすには`secure-store-adapter.ts`をプラットフォーム分岐させる追加実装が必要(未着手)
 
 ---
 
