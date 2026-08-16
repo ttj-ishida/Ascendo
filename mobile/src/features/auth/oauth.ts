@@ -16,6 +16,9 @@ const REDIRECT_TO = Linking.createURL('oauth-callback');
  * (Authentication → Providers) — see docs/frontend_implementation_plan.md for the external
  * setup steps this depends on. */
 export async function signInWithProvider(provider: 'google' | 'apple'): Promise<void> {
+  // TODO(temporary debug log): remove once the Supabase "Redirect URLs" allow-list entry is
+  // confirmed to match this value in every dev environment (Expo Go LAN/tunnel/emulator).
+  console.log('[oauth] REDIRECT_TO =', REDIRECT_TO);
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: { redirectTo: REDIRECT_TO, skipBrowserRedirect: true },
