@@ -3162,6 +3162,12 @@ git commit -m "feat(frontend): add Settings and Upgrade-info screens"
 
 全11画面が実装され、`npm test`が純粋ロジック(Leitner算出、時間計測、フォームバリデーション、認証ガード判定、スコア集計等)を自動検証する。画面自体の見た目・実機動作は`npx expo start`での目視確認が必要(Global Constraints参照)。
 
+### 追加: Google/Apple OAuthログイン(計画外、2026-08-16追加)
+
+`frontend_design.md`には含まれていなかったが、ユーザー要望により追加。`signup-or-login.tsx`に「Googleでログイン」「Appleでログイン」ボタンを追加し、`src/features/auth/oauth.ts`(`signInWithOAuth` + `expo-web-browser`でのブラウザ経由フロー、確認メールのディープリンクと同じ「URLからトークン抽出→`setSession`」パターンを再利用)で実装。コールバックURL解析部分(`parseOAuthCallbackUrl`)は`src/features/auth/oauth-callback.ts`に分離し、Jestで単体テスト(5件)。
+
+**この機能を実際に使うには、Supabaseダッシュボード側でGoogle/AppleのOAuthプロバイダを有効化する外部設定(Google Cloud ConsoleでのOAuthクライアント作成、Apple Developer Program登録+Services ID設定)が別途必要**。実装者ではなくプロジェクトオーナーが認証情報を扱う都合上、コード実装のみ完了し外部設定は未実施。
+
 ## 未着手・今後の検討事項
 
 - **`AssessmentRunner`の配線が未完了**: Task 18でコンポーネントは作成したが、Vocab/Grammar/Listening画面の「テストする」ボタンからは呼び出していない。理由: 現在の3画面は`content_group_id`でグルーピングせず全件取得しているため、`POST /assessments`が要求する`sourceGroupIds`をどの単位で選ばせるか(単語帳ごと？文法トピックごと？)がUXとして未設計。`frontend_design.md`に立ち返って「コンテンツグループの選択画面」を追加設計する必要がある
