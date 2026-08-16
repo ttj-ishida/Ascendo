@@ -3,22 +3,22 @@ import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '../../lib/supabase';
 import { parseOAuthCallbackUrl } from './oauth-callback';
 
-// Linking.createURL resolves to the right scheme for whichever environment is running:
-// exp://<lan-ip>:<port>/--/oauth-callback under Expo Go (dev), ascendo://oauth-callback in a
-// standalone/dev-client build. A hardcoded 'ascendo://...' only works in the latter — Expo Go
-// does not own that custom scheme, so Android reports "Navigation is unreachable" when Supabase
-// tries to hand control back to the app. See docs/frontend_implementation_plan.md for the
-// matching Supabase "Redirect URLs" allow-list entry this depends on (exp://** for dev).
+// TODO(OAuth on hold — see docs/frontend_implementation_plan.md "Known issues" section):
+// Under Expo Go, Linking.createURL produces exp://<lan-ip>:<port>/--/oauth-callback. Real-device
+// testing showed Supabase's authorize endpoint receives this value byte-for-byte correctly (it
+// matches an exact entry added to the dashboard's Redirect URLs) yet still falls back to the
+// project's default Site URL — while the structurally simpler 'ascendo://oauth-callback' (no
+// port, no '--' path segment) matched and worked. This points to a GoTrue-side redirect URL
+// parsing/matching gap for exp://host:port/... shapes, not a app-code or config bug. Re-verify
+// once testing moves to a Development Build (npx expo run:android), where the real 'ascendo://'
+// scheme is registered with the OS and this whole exp:// detour is unnecessary.
 const REDIRECT_TO = Linking.createURL('oauth-callback');
 
 /** Opens the provider's OAuth consent screen in an in-app browser, then establishes the
  * resulting Supabase session. Requires the provider to be enabled in the Supabase dashboard
  * (Authentication → Providers) — see docs/frontend_implementation_plan.md for the external
- * setup steps this depends on. */
+ * setup steps this depends on. NOTE: on hold under Expo Go — see the TODO above REDIRECT_TO. */
 export async function signInWithProvider(provider: 'google' | 'apple'): Promise<void> {
-  // TODO(temporary debug log): remove once the Supabase "Redirect URLs" allow-list entry is
-  // confirmed to match this value in every dev environment (Expo Go LAN/tunnel/emulator).
-  console.log('[oauth] REDIRECT_TO =', REDIRECT_TO);
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: { redirectTo: REDIRECT_TO, skipBrowserRedirect: true },
@@ -26,8 +26,6 @@ export async function signInWithProvider(provider: 'google' | 'apple'): Promise<
   if (error || !data.url) {
     throw new Error(error?.message ?? 'OAuth URL was not returned by Supabase');
   }
-  // TODO(temporary debug log): remove alongside the REDIRECT_TO log above.
-  console.log('[oauth] authorize URL from Supabase =', data.url);
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, REDIRECT_TO);
   if (result.type !== 'success' || !result.url) {
