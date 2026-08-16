@@ -26,6 +26,8 @@ export async function signInWithProvider(provider: 'google' | 'apple'): Promise<
   if (error || !data.url) {
     throw new Error(error?.message ?? 'OAuth URL was not returned by Supabase');
   }
+  // TODO(temporary debug log): remove alongside the REDIRECT_TO log above.
+  console.log('[oauth] authorize URL from Supabase =', data.url);
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, REDIRECT_TO);
   if (result.type !== 'success' || !result.url) {
