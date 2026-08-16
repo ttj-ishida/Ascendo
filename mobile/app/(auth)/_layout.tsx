@@ -8,8 +8,6 @@ import { colors } from '../../src/theme/colors';
  * guard in the opposite direction. */
 export default function AuthLayout() {
   const auth = useAuth();
-  // TODO(temporary debug log): remove once the Web redirect-loop report is diagnosed.
-  console.log('[auth-layout] render', { authStatus: auth.status });
 
   if (auth.status === 'loading') {
     return (

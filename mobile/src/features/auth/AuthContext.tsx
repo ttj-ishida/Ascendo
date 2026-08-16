@@ -30,6 +30,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.subscription.unsubscribe();
   }, []);
 
+  // Lives here (root-level AuthProvider), not in (app)/_layout.tsx, so it isn't lost if that
+  // layout ever gets torn down and rebuilt by an in-group <Redirect> — that combination
+  // previously reset a locally-held hasActivePlan back to null on every redirect, re-running
+  // this same query and re-triggering the same redirect forever (found via real Web testing;
+  // visible as an infinite "hasActivePlan: false" / "hasActivePlan: null" render alternation).
+  useEffect(() => {
+    if (state.status !== 'signed-in') return;
+    supabase
+      .from('learning_plans')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'active')
+      .then(({ count }) => dispatch({ type: 'ACTIVE_PLAN_RESOLVED', hasActivePlan: (count ?? 0) > 0 }));
+  }, [state.status]);
+
   return <AuthStateContext.Provider value={state}>{children}</AuthStateContext.Provider>;
 }
 
