@@ -1,8 +1,8 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { markOnboardingSeen } from '../../src/lib/onboarding-flag';
+import { platformStore } from '../../src/lib/platform-secure-store';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { typography } from '../../src/theme/typography';
@@ -15,7 +15,7 @@ export default function Onboarding() {
       <PrimaryButton
         title="はじめる"
         onPress={async () => {
-          await markOnboardingSeen(SecureStore);
+          await markOnboardingSeen(platformStore);
           router.replace('/(auth)/signup-or-login');
         }}
       />
