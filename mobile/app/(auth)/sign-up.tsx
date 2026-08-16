@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { supabase } from '../../src/lib/supabase';
 import { signUpSchema } from '../../src/features/auth/schemas';
 import { TextField } from '../../src/components/TextField';
@@ -29,7 +30,10 @@ export default function SignUp() {
     const { error } = await supabase.auth.signUp({
       email: result.data.email,
       password: result.data.password,
-      options: { emailRedirectTo: 'ascendo://sign-up-confirm' },
+      // Linking.createURL resolves to exp://<lan-ip>:<port>/--/sign-up-confirm under Expo Go
+      // and ascendo://sign-up-confirm in a standalone/dev-client build — see oauth.ts for the
+      // full explanation. Requires a matching entry in Supabase's Redirect URLs allow-list.
+      options: { emailRedirectTo: Linking.createURL('sign-up-confirm') },
     });
     if (error) {
       setSubmitError(error.message);

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import * as Linking from 'expo-linking';
 import { supabase } from '../../src/lib/supabase';
 import { forgotPasswordSchema } from '../../src/features/auth/schemas';
 import { TextField } from '../../src/components/TextField';
@@ -21,7 +22,9 @@ export default function ForgotPassword() {
     }
     setError(null);
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(result.data.email, {
-      redirectTo: 'ascendo://reset-password',
+      // See sign-up.tsx / oauth.ts for why Linking.createURL is required instead of a
+      // hardcoded 'ascendo://...' — Expo Go does not own that custom scheme.
+      redirectTo: Linking.createURL('reset-password'),
     });
     if (resetError) {
       setError(resetError.message);
