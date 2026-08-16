@@ -29,8 +29,9 @@ export default function SignupOrLogin() {
       <View style={styles.divider} />
 
       <PrimaryButton title="Googleでログイン" onPress={() => handleOAuth('google')} />
-      <View style={{ height: spacing.md }} />
-      <PrimaryButton title="Appleでログイン" onPress={() => handleOAuth('apple')} />
+      {/* Appleでログインは非表示中: Apple Developer Program(有料)への登録待ち。
+          再度有効化する際は、この直後に以下を追加するだけでよい:
+          <View style={{ height: spacing.md }} /><PrimaryButton title="Appleでログイン" onPress={() => handleOAuth('apple')} /> */}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
