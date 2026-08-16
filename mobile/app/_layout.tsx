@@ -20,6 +20,8 @@ let lastHandledUrl: string | null = null;
 
 async function handleIncomingUrl(url: string) {
   const kind = parseAuthDeepLink(url);
+  // TODO(temporary debug log): remove once the Web redirect-loop report is diagnosed.
+  console.log('[deep-link] handleIncomingUrl called', { url, kind, lastHandledUrl });
   if (!kind || url === lastHandledUrl) return;
   lastHandledUrl = url;
 

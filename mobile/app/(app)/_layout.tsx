@@ -20,6 +20,8 @@ export default function AppLayout() {
   }, [auth.status]);
 
   const redirect = determineRedirect({ auth, hasActivePlan });
+  // TODO(temporary debug log): remove once the Web redirect-loop report is diagnosed.
+  console.log('[app-layout] render', { authStatus: auth.status, hasActivePlan, redirect });
   if (redirect) return <Redirect href={redirect as never} />;
 
   if (auth.status === 'loading' || (auth.status === 'signed-in' && hasActivePlan === null)) {
