@@ -1,4 +1,4 @@
-import { Redirect, Slot } from 'expo-router';
+import { Redirect, Slot, usePathname } from 'expo-router';
 import { View, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../src/features/auth/AuthContext';
 import { determineRedirect } from '../../src/features/auth/guard-logic';
@@ -6,7 +6,8 @@ import { colors } from '../../src/theme/colors';
 
 export default function AppLayout() {
   const auth = useAuth();
-  const redirect = determineRedirect(auth);
+  const pathname = usePathname();
+  const redirect = determineRedirect(auth, pathname);
   if (redirect) return <Redirect href={redirect as never} />;
 
   if (auth.status === 'loading' || (auth.status === 'signed-in' && auth.hasActivePlan === null)) {
