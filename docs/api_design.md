@@ -81,8 +81,9 @@ flowchart LR
 
 | ドメイン | Method & Path | 説明 |
 |---|---|---|
-| Learning Plan | `POST /api/v1/plans/chat` | AIとの対話1ターン(ユーザー発話→AI応答)。会話はクライアント側で保持し、毎回文脈を渡す(MVPは簡易版のためサーバー側セッション永続化はしない) |
-| Learning Plan | `POST /api/v1/plans` | 対話結果を元に学習計画(JSON)を確定生成。`target_lang`必須。`try_consume_plan_generation`で無料枠をアトミックに消費し、`learning_plans`に保存。同一言語でactiveな計画が既にあれば409 |
+| Learning Plan | `GET /api/v1/plans/draft?targetLang=en` | 対象言語の進行中の対話下書きを取得(なければ空配列)。画面初回表示時の復元に使用 |
+| Learning Plan | `POST /api/v1/plans/chat` | AIとの対話1ターン(ユーザー発話→AI応答)。会話は`plan_creation_drafts`テーブルにサーバー側でupsert保存し、Web/モバイル間で同じ下書きを継続できる(2026-08-18変更: 当初はクライアント側保持のみだったが、複数プラットフォーム提供のサービスでは端末ローカル保存だけでは意味がないためサーバー側永続化に変更) |
+| Learning Plan | `POST /api/v1/plans` | 対話結果を元に学習計画(JSON)を確定生成。`target_lang`必須。`try_consume_plan_generation`で無料枠をアトミックに消費し、`learning_plans`に保存。同一言語でactiveな計画が既にあれば409。成功時は対応する`plan_creation_drafts`行を削除 |
 | Content Catalog | `POST /api/v1/content/listening-passages/{id}/audio` | OpenAI TTSで音声生成しSupabase Storageにキャッシュ保存(管理者操作)。`ai_usage_logs`にコスト記録 |
 | Assessment | `POST /api/v1/assessments` | 指定した`content_groups`(`source_group_ids`)から出題ロジックでテストインスタンス(`tests`+`test_items`)を組み立てて生成 |
 | Identity & Account | `DELETE /api/v1/identity/me` | 退会処理。`auth.users`削除はservice_role必須のため、Supabase Admin APIをバックエンド経由で呼ぶ |
@@ -107,12 +108,25 @@ flowchart LR
 
 TypeScript型定義で記載する(バックエンド・Expoクライアント双方TypeScriptのため、そのまま型共有できる想定)。
 
+### 5-0. `GET /api/v1/plans/draft?targetLang=en`
+
+```ts
+interface PlanDraftResponse {
+  messages: ChatMessage[];  // 空配列 = 下書きなし(新規会話)
+  readyToGenerate: boolean;
+}
+```
+
+**エラー**: `401 UNAUTHORIZED`(未ログイン)。下書きが存在しない場合もエラーにはせず`{messages: [], readyToGenerate: false}`を返す
+
 ### 5-1. `POST /api/v1/plans/chat`
 
 ```ts
 interface PlanChatRequest {
   targetLang: string;       // 学習対象言語コード(例: "en")。MVPでは "en" のみ有効
-  messages: ChatMessage[];  // 会話履歴全体。クライアント側で保持し毎回渡す(サーバー側セッション永続化なし)
+  messages: ChatMessage[];  // クライアントが渡す会話履歴全体(そのターンのユーザー発話まで含む)。
+                             // サーバー側は応答生成後、この履歴+AI応答を`plan_creation_drafts`に
+                             // upsert保存する(profile_id, target_langの組で一意)
 }
 
 interface ChatMessage {

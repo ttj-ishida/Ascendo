@@ -4,10 +4,8 @@ import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { callApi, ApiError } from '../../src/lib/api-client';
 import { chatReducer } from '../../src/features/plan-creation/chat-reducer';
-import { draftKeyFor, serializeChatState, deserializeChatState } from '../../src/features/plan-creation/persistence';
 import { useAuth } from '../../src/features/auth/AuthContext';
 import { supabase } from '../../src/lib/supabase';
-import { platformStore } from '../../src/lib/platform-secure-store';
 import { TextField } from '../../src/components/TextField';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { colors } from '../../src/theme/colors';
@@ -15,36 +13,38 @@ import { spacing } from '../../src/theme/spacing';
 import { typography } from '../../src/theme/typography';
 
 const { apiBaseUrl } = Constants.expoConfig?.extra ?? {};
+const TARGET_LANG = 'en';
 
 export default function PlanCreation() {
   const auth = useAuth();
   const [state, dispatch] = useReducer(chatReducer, { messages: [], readyToGenerate: false });
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [draftLoaded, setDraftLoaded] = useState(false);
 
-  // Restores an in-progress conversation after a reload/relaunch — this screen previously held
-  // it only in useReducer's in-memory state, so refreshing the page during Web testing lost the
-  // whole exchange (reported by the user). Runs once; draftLoaded gates the save effect below so
-  // it can't fire before this async read resolves and overwrite the persisted draft with the
-  // reducer's initial empty state.
+  // Restores an in-progress conversation from the backend (plan_creation_drafts table), not
+  // device storage — this app is offered on both Web and mobile, so a draft that only lived on
+  // one device/browser would be lost switching between them (raised by the user explicitly:
+  // client-only persistence "doesn't make sense" for a multi-platform service). The backend
+  // upserts this draft on every chat turn (see backend/src/domains/plans/service.ts), so the
+  // client only needs to fetch it once on mount.
   useEffect(() => {
     if (auth.status !== 'signed-in') return;
-    platformStore.getItemAsync(draftKeyFor(auth.userId)).then((raw) => {
-      const restored = deserializeChatState(raw);
-      if (restored) dispatch({ type: 'RESTORE', state: restored });
-      setDraftLoaded(true);
-    });
+    callApi<{ messages: typeof state.messages; readyToGenerate: boolean }>(
+      { fetchFn: fetch, baseUrl: apiBaseUrl as string, accessToken: auth.accessToken },
+      `/api/v1/plans/draft?targetLang=${TARGET_LANG}`,
+    )
+      .then((draft) => {
+        if (draft.messages.length > 0) {
+          dispatch({ type: 'RESTORE', state: draft });
+        }
+      })
+      .catch((err) => {
+        // Non-fatal: a failed restore just means the conversation starts empty, same as a
+        // brand-new user. Logged via api-client.ts's own console.error already.
+        void err;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.status === 'signed-in' ? auth.userId : null]);
-
-  // Persists on every change once the initial restore has completed. Keyed per user (not one
-  // fixed key) so this screen's logout button can't leak one account's draft into the next
-  // account signed in on the same device.
-  useEffect(() => {
-    if (auth.status !== 'signed-in' || !draftLoaded) return;
-    platformStore.setItemAsync(draftKeyFor(auth.userId), serializeChatState(state));
-  }, [state, draftLoaded, auth.status === 'signed-in' ? auth.userId : null]);
 
   if (auth.status !== 'signed-in') return null;
 
@@ -63,7 +63,7 @@ export default function PlanCreation() {
       const result = await callApi<{ reply: string; readyToGenerate: boolean }>(
         { fetchFn: fetch, baseUrl: apiBaseUrl as string, accessToken: auth.accessToken },
         '/api/v1/plans/chat',
-        { method: 'POST', body: JSON.stringify({ targetLang: 'en', messages: [...state.messages, { role: 'user', content }] }) },
+        { method: 'POST', body: JSON.stringify({ targetLang: TARGET_LANG, messages: [...state.messages, { role: 'user', content }] }) },
       );
       dispatch({ type: 'AI_REPLY', content: result.reply, readyToGenerate: result.readyToGenerate });
     } catch (err) {
@@ -77,9 +77,8 @@ export default function PlanCreation() {
       await callApi(
         { fetchFn: fetch, baseUrl: apiBaseUrl as string, accessToken: auth.accessToken },
         '/api/v1/plans',
-        { method: 'POST', body: JSON.stringify({ targetLang: 'en', messages: state.messages }) },
+        { method: 'POST', body: JSON.stringify({ targetLang: TARGET_LANG, messages: state.messages }) },
       );
-      await platformStore.deleteItemAsync(draftKeyFor(auth.userId));
       router.replace('/(app)');
     } catch (err) {
       if (err instanceof ApiError && err.code === 'FREE_QUOTA_EXHAUSTED') {

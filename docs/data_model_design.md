@@ -774,11 +774,47 @@ create policy admin_audit_logs_select on public.admin_audit_logs
 -- insert/update/deleteポリシーなし(log_admin_action()がsecurity definerで書き込む。3-2参照)
 ```
 
+### 3-17. `plan_creation_drafts`(2026-08-18追加)
+
+学習計画作成画面のAIとの対話を、サーバー側で永続化するためのテーブル。当初はクライアント端末のローカルストレージのみで保持する設計だったが、Web/モバイル両方でサービス提供しているため端末ローカル保存だけでは同一ユーザーが別プラットフォームから続きを再開できず「意味がない」との指摘を受け、サーバー側保存に変更した(`api_design.md`§4-5参照)。
+
+```sql
+create table public.plan_creation_drafts (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  target_lang text not null,
+  messages jsonb not null default '[]'::jsonb,
+  ready_to_generate boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- learning_plansのADR-13と同様、ユーザー・言語ごとに下書きは1件まで。チャット1ターンごとにupsert
+create unique index plan_creation_drafts_one_per_lang
+  on public.plan_creation_drafts (profile_id, target_lang);
+
+alter table public.plan_creation_drafts enable row level security;
+create policy plan_creation_drafts_select on public.plan_creation_drafts
+  for select using (profile_id = auth.uid());
+create policy plan_creation_drafts_insert on public.plan_creation_drafts
+  for insert with check (profile_id = auth.uid());
+create policy plan_creation_drafts_update on public.plan_creation_drafts
+  for update using (profile_id = auth.uid());
+create policy plan_creation_drafts_delete on public.plan_creation_drafts
+  for delete using (profile_id = auth.uid());
+
+create trigger trg_plan_creation_drafts_updated_at
+  before update on public.plan_creation_drafts
+  for each row execute function public.set_updated_at();
+```
+
+学習計画が実際に生成される(`POST /api/v1/plans`成功)と、対応する下書き行はバックエンドが削除する。
+
 ---
 
 ## 4. `updated_at`自動更新トリガーの適用対象
 
-`set_updated_at()`(2-2)を`before update`で適用するテーブル: `profiles`, `subscriptions`, `listening_passages`, `learning_contents`, `vocabulary_items`, `grammar_items`, `listening_items`, `shadowing_items`, `content_groups`, `learning_plans`, `plan_day_logs`, `plan_week_logs`, `tests`, `user_vocabulary_progress`。
+`set_updated_at()`(2-2)を`before update`で適用するテーブル: `profiles`, `subscriptions`, `listening_passages`, `learning_contents`, `vocabulary_items`, `grammar_items`, `listening_items`, `shadowing_items`, `content_groups`, `learning_plans`, `plan_day_logs`, `plan_week_logs`, `tests`, `user_vocabulary_progress`, `plan_creation_drafts`。
 
 (`learning_records`, `ai_usage_logs`, `admin_audit_logs`は追記のみのイベントログのため対象外。`content_group_items`, `tags`, `content_tags`, `content_group_tags`, `test_items`は更新より削除→再作成が基本运用のため対象外)
 

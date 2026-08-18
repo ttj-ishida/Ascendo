@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { AppError } from '../../shared/errors.ts';
-import { chatTurn, createPlan } from './service.ts';
+import { chatTurn, createPlan, getDraft } from './service.ts';
 import type { AiAdapter } from '../../shared/ai-adapter.ts';
 import type { AuthedRequest } from '../../shared/auth/middleware.ts';
 import type { ChatMessage } from '../../types.ts';
@@ -29,6 +29,17 @@ function isChatMessageArray(value: unknown): value is ChatMessage[] {
 export function createPlansRouter(deps: PlansRouterDeps): Router {
   const router = Router();
 
+  router.get('/draft', async (req: AuthedRequest, res, next) => {
+    try {
+      const targetLang = typeof req.query.targetLang === 'string' ? req.query.targetLang : 'en';
+      const userClient = deps.createUserClient(req.user!.accessToken);
+      const draft = await getDraft({ userClient }, { userId: req.user!.id, targetLang });
+      res.status(200).json(draft ?? { messages: [], readyToGenerate: false });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   router.post('/chat', async (req: AuthedRequest, res, next) => {
     try {
       const { targetLang, messages } = req.body as { targetLang?: unknown; messages?: unknown };
@@ -36,7 +47,11 @@ export function createPlansRouter(deps: PlansRouterDeps): Router {
         throw new AppError('INVALID_MESSAGES', 'targetLang must be a string and messages must be a ChatMessage[]');
       }
 
-      const result = await chatTurn(deps, { targetLang, messages, userId: req.user!.id });
+      const userClient = deps.createUserClient(req.user!.accessToken);
+      const result = await chatTurn(
+        { aiAdapter: deps.aiAdapter, serviceClient: deps.serviceClient, userClient },
+        { targetLang, messages, userId: req.user!.id },
+      );
       res.status(200).json(result);
     } catch (err) {
       next(err);

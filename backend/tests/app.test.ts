@@ -15,12 +15,23 @@ function buildFakeDeps(overrides: Partial<AppDeps> = {}): AppDeps {
 
   const serviceClient = { from: () => ({ insert: () => Promise.resolve({ error: null }) }) } as never;
 
+  const draftChain = {
+    eq() { return this; },
+    maybeSingle: () => Promise.resolve({ data: null, error: null }),
+    then(resolve: (v: { error: null }) => void) { resolve({ error: null }); },
+  };
+
   const createUserClient = () =>
     ({
       rpc: () => Promise.resolve({ data: true, error: null }),
-      from: () => ({
-        insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: 'plan-1', target_lang: 'en', plan_json: {}, created_at: 'now' }, error: null }) }) }),
-      }),
+      from: (table: string) => {
+        if (table === 'plan_creation_drafts') {
+          return { upsert: () => Promise.resolve({ error: null }), delete: () => draftChain, select: () => draftChain };
+        }
+        return {
+          insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: 'plan-1', target_lang: 'en', plan_json: {}, created_at: 'now' }, error: null }) }) }),
+        };
+      },
       storage: { from: () => ({ upload: () => Promise.resolve({ error: null }) }) },
     }) as never;
 
