@@ -27,6 +27,10 @@ test('does not redirect when already on plan-creation with no active plan (avoid
   expect(determineRedirect(SIGNED_IN_NO_PLAN, '/plan-creation')).toBeNull();
 });
 
+test('does not redirect away from upgrade-info with no active plan (part of the plan-creation flow, reached after hitting the free quota)', () => {
+  expect(determineRedirect(SIGNED_IN_NO_PLAN, '/upgrade-info')).toBeNull();
+});
+
 test('allows access (no redirect) when signed in with an active plan', () => {
   expect(determineRedirect(SIGNED_IN_WITH_PLAN, '/home')).toBeNull();
 });
