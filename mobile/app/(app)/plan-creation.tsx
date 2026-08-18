@@ -1,14 +1,16 @@
 import { useReducer, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { callApi, ApiError } from '../../src/lib/api-client';
 import { chatReducer } from '../../src/features/plan-creation/chat-reducer';
 import { useAuth } from '../../src/features/auth/AuthContext';
+import { supabase } from '../../src/lib/supabase';
 import { TextField } from '../../src/components/TextField';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
+import { typography } from '../../src/theme/typography';
 
 const { apiBaseUrl } = Constants.expoConfig?.extra ?? {};
 
@@ -19,6 +21,11 @@ export default function PlanCreation() {
   const [error, setError] = useState<string | null>(null);
 
   if (auth.status !== 'signed-in') return null;
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.replace('/(auth)/onboarding');
+  }
 
   async function sendMessage() {
     if (auth.status !== 'signed-in' || !input.trim()) return;
@@ -58,6 +65,9 @@ export default function PlanCreation() {
 
   return (
     <View style={styles.container}>
+      <Pressable onPress={handleLogout} style={styles.logout}>
+        <Text style={styles.logoutText}>ログアウト</Text>
+      </Pressable>
       <ScrollView style={styles.messages}>
         {state.messages.map((m, i) => (
           <Text key={i} style={m.role === 'user' ? styles.userBubble : styles.aiBubble}>{m.content}</Text>
@@ -78,6 +88,8 @@ export default function PlanCreation() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: spacing.lg, backgroundColor: colors.background },
+  logout: { alignSelf: 'flex-end', marginBottom: spacing.sm },
+  logoutText: { ...typography.caption, color: colors.textMuted },
   messages: { flex: 1, marginBottom: spacing.md },
   userBubble: { alignSelf: 'flex-end', backgroundColor: colors.primary, color: '#fff', borderRadius: 12, padding: spacing.sm, marginVertical: spacing.xs },
   aiBubble: { alignSelf: 'flex-start', backgroundColor: colors.primaryLight, color: colors.text, borderRadius: 12, padding: spacing.sm, marginVertical: spacing.xs },
