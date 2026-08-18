@@ -1,11 +1,13 @@
-import { useReducer, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import { callApi, ApiError } from '../../src/lib/api-client';
 import { chatReducer } from '../../src/features/plan-creation/chat-reducer';
+import { draftKeyFor, serializeChatState, deserializeChatState } from '../../src/features/plan-creation/persistence';
 import { useAuth } from '../../src/features/auth/AuthContext';
 import { supabase } from '../../src/lib/supabase';
+import { platformStore } from '../../src/lib/platform-secure-store';
 import { TextField } from '../../src/components/TextField';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { colors } from '../../src/theme/colors';
@@ -19,6 +21,30 @@ export default function PlanCreation() {
   const [state, dispatch] = useReducer(chatReducer, { messages: [], readyToGenerate: false });
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
+  // Restores an in-progress conversation after a reload/relaunch — this screen previously held
+  // it only in useReducer's in-memory state, so refreshing the page during Web testing lost the
+  // whole exchange (reported by the user). Runs once; draftLoaded gates the save effect below so
+  // it can't fire before this async read resolves and overwrite the persisted draft with the
+  // reducer's initial empty state.
+  useEffect(() => {
+    if (auth.status !== 'signed-in') return;
+    platformStore.getItemAsync(draftKeyFor(auth.userId)).then((raw) => {
+      const restored = deserializeChatState(raw);
+      if (restored) dispatch({ type: 'RESTORE', state: restored });
+      setDraftLoaded(true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.status === 'signed-in' ? auth.userId : null]);
+
+  // Persists on every change once the initial restore has completed. Keyed per user (not one
+  // fixed key) so this screen's logout button can't leak one account's draft into the next
+  // account signed in on the same device.
+  useEffect(() => {
+    if (auth.status !== 'signed-in' || !draftLoaded) return;
+    platformStore.setItemAsync(draftKeyFor(auth.userId), serializeChatState(state));
+  }, [state, draftLoaded, auth.status === 'signed-in' ? auth.userId : null]);
 
   if (auth.status !== 'signed-in') return null;
 
@@ -53,6 +79,7 @@ export default function PlanCreation() {
         '/api/v1/plans',
         { method: 'POST', body: JSON.stringify({ targetLang: 'en', messages: state.messages }) },
       );
+      await platformStore.deleteItemAsync(draftKeyFor(auth.userId));
       router.replace('/(app)');
     } catch (err) {
       if (err instanceof ApiError && err.code === 'FREE_QUOTA_EXHAUSTED') {

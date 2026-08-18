@@ -7,7 +7,8 @@ export interface ChatState {
 
 export type ChatEvent =
   | { type: 'USER_MESSAGE'; content: string }
-  | { type: 'AI_REPLY'; content: string; readyToGenerate: boolean };
+  | { type: 'AI_REPLY'; content: string; readyToGenerate: boolean }
+  | { type: 'RESTORE'; state: ChatState };
 
 export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
   switch (event.type) {
@@ -18,5 +19,7 @@ export function chatReducer(state: ChatState, event: ChatEvent): ChatState {
         messages: [...state.messages, { role: 'assistant', content: event.content }],
         readyToGenerate: event.readyToGenerate,
       };
+    case 'RESTORE':
+      return event.state;
   }
 }

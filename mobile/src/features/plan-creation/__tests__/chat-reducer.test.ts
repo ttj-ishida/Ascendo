@@ -19,3 +19,12 @@ test('messages accumulate across multiple dispatches', () => {
   state = chatReducer(state, { type: 'USER_MESSAGE', content: 'TOEIC 500' });
   expect(state.messages).toHaveLength(3);
 });
+
+test('RESTORE replaces the whole state wholesale (used to resume a persisted draft)', () => {
+  const persisted: ChatState = {
+    messages: [{ role: 'user', content: 'Hi' }, { role: 'assistant', content: 'Hello!' }],
+    readyToGenerate: true,
+  };
+  const next = chatReducer(EMPTY, { type: 'RESTORE', state: persisted });
+  expect(next).toEqual(persisted);
+});
