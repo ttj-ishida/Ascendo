@@ -4,6 +4,7 @@ import { supabase } from '../../../src/lib/supabase';
 import { useAuth } from '../../../src/features/auth/AuthContext';
 import { useStudyTimer } from '../../../src/features/study-timer/useStudyTimer';
 import { nextCycle, pickNextWords } from '../../../src/features/vocab/leitner';
+import { fetchTodaysContentIds } from '../../../src/features/plan/fetch-todays-content-ids';
 import { PrimaryButton } from '../../../src/components/PrimaryButton';
 import { Card } from '../../../src/components/Card';
 import { colors } from '../../../src/theme/colors';
@@ -27,14 +28,18 @@ export default function Vocab() {
   useEffect(() => {
     if (auth.status !== 'signed-in') return;
 
-    supabase.from('learning_plans').select('id').eq('status', 'active').single().then(({ data }) => {
-      if (data) setLearningPlanId(data.id);
-    });
+    fetchTodaysContentIds().then(async ({ learningPlanId: planId, contentIds }) => {
+      setLearningPlanId(planId);
 
-    Promise.all([
-      supabase.from('vocabulary_items').select('content_id, target_text, target_phonetic, native_text'),
-      supabase.from('user_vocabulary_progress').select('content_id, cycle').eq('profile_id', auth.userId),
-    ]).then(([wordsRes, progressRes]) => {
+      // contentIds null = no plan-based scoping available (see fetch-todays-content-ids.ts) —
+      // fall back to every published word, same as before the plan was wired in.
+      let wordsQuery = supabase.from('vocabulary_items').select('content_id, target_text, target_phonetic, native_text');
+      if (contentIds) wordsQuery = wordsQuery.in('content_id', contentIds);
+
+      const [wordsRes, progressRes] = await Promise.all([
+        wordsQuery,
+        supabase.from('user_vocabulary_progress').select('content_id, cycle').eq('profile_id', auth.userId),
+      ]);
       const allWords = (wordsRes.data ?? []) as VocabWord[];
       const progressMap = new Map((progressRes.data ?? []).map((p) => [p.content_id, p.cycle]));
       const nextIds = pickNextWords(progressMap, allWords.map((w) => w.content_id), 10);

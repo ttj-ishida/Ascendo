@@ -3170,7 +3170,8 @@ git commit -m "feat(frontend): add Settings and Upgrade-info screens"
 
 ## 未着手・今後の検討事項
 
-- **`AssessmentRunner`の配線が未完了**: Task 18でコンポーネントは作成したが、Vocab/Grammar/Listening画面の「テストする」ボタンからは呼び出していない。理由: 現在の3画面は`content_group_id`でグルーピングせず全件取得しているため、`POST /assessments`が要求する`sourceGroupIds`をどの単位で選ばせるか(単語帳ごと？文法トピックごと？)がUXとして未設計。`frontend_design.md`に立ち返って「コンテンツグループの選択画面」を追加設計する必要がある
+- **`AssessmentRunner`の配線が未完了**: Task 18でコンポーネントは作成したが、Vocab/Grammar/Listening画面の「テストする」ボタンからは呼び出していない。理由: `POST /assessments`が要求する`sourceGroupIds`をどの単位で選ばせるか(単語帳ごと？文法トピックごと？)がUXとして未設計。`frontend_design.md`に立ち返って「コンテンツグループの選択画面」を追加設計する必要がある
+- **修正済み(2026-08-19、ユーザー要望)**: 上記に記載していた「3画面が`content_group_id`でグルーピングせず全件取得している」状態は解消。学習計画(`plan_json`)から「今日が属するフェーズ」を判定し、そのフェーズの`weeklyTasks[].contentGroupId`(無ければplan全体の`contentGroupIds`)に紐づく`content_group_items`でVocab/Grammar/Listening画面の出題を絞り込むよう変更(`src/features/plan/today-content.ts`の`findActivePhase`/`todaysContentGroupIds`が純粋関数、`src/features/plan/fetch-todays-content-ids.ts`が実際のSupabase参照)。計画がどのグループも指していない場合(コンテンツが存在しない状態で生成された既存プランなど)は、これまで通り全件を出題するフォールバックを維持。あわせて`backend/src/shared/ai-adapter.ts`のプロンプトに実在する`content_groups`一覧を渡すよう修正(ADR-05)し、`supabase/seed_sample_content.sql`でサンプルの単語/文法/リスニング教材を投入できるようにした
 - **`MonthlyTask.done`のバックエンド側不整合**: Home画面(Task 14)は月次タスクにチェックボックス(`done: boolean`)を表示する設計にしたが、`backend/src/shared/ai-adapter.ts`の`generatePlan()`のプロンプトはこのフィールドを生成するよう指示していない(`backend_implementation_plan.md`作成時点では`phases: unknown[]`として不透明に扱われていたため気づかれなかった)。また、チェック操作を`learning_plans.plan_json`へ永続化する書き込み経路(Supabase update)も本計画では未実装。バックエンド側のプロンプト修正+フロントの書き込み処理を追加で設計・実装する必要がある
 - Home画面の週次実績サマリーは`plannedMinutes`(週次目標)を`plan_week_logs`から取得していない(現状`null`固定で呼んでいる。`plan_week_logs`テーブルへの書き込みフロー自体が未設計)
 - プッシュ通知・オフライン対応は`frontend_design.md`§13の通りスコープ外

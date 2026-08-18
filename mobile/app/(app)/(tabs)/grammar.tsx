@@ -3,6 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { supabase } from '../../../src/lib/supabase';
 import { useAuth } from '../../../src/features/auth/AuthContext';
 import { useStudyTimer } from '../../../src/features/study-timer/useStudyTimer';
+import { fetchTodaysContentIds } from '../../../src/features/plan/fetch-todays-content-ids';
 import { isCorrectChoice } from '../../../src/features/grammar/scoring';
 import { Card } from '../../../src/components/Card';
 import { colors } from '../../../src/theme/colors';
@@ -26,10 +27,15 @@ export default function Grammar() {
 
   useEffect(() => {
     if (auth.status !== 'signed-in') return;
-    supabase.from('learning_plans').select('id').eq('status', 'active').single().then(({ data }) => {
-      if (data) setLearningPlanId(data.id);
-    });
-    supabase.from('grammar_items').select('content_id, question, choices, answer, explanation').then(({ data }) => {
+    fetchTodaysContentIds().then(async ({ learningPlanId: planId, contentIds }) => {
+      setLearningPlanId(planId);
+
+      // contentIds null = no plan-based scoping available (see fetch-todays-content-ids.ts) —
+      // fall back to every published question, same as before the plan was wired in.
+      let query = supabase.from('grammar_items').select('content_id, question, choices, answer, explanation');
+      if (contentIds) query = query.in('content_id', contentIds);
+
+      const { data } = await query;
       setQuestions((data ?? []) as GrammarQuestion[]);
     });
   }, [auth.status]);
