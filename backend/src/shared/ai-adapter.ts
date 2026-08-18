@@ -30,6 +30,21 @@ export function parsePlanResponse(raw: string): LearningPlanJSON {
 
 const READY_TO_GENERATE_MARKER = '[READY_TO_GENERATE]';
 
+/** Claude rejects a request whose message list ends with an 'assistant' turn ("This model does
+ * not support assistant message prefill. The conversation must end with a user message.") — but
+ * the plan-creation chat flow only lets the user reach "generate the plan" right after the AI's
+ * own reply sets readyToGenerate (see mobile/app/(app)/plan-creation.tsx), so the stored
+ * conversation handed to generatePlan() always ends with that assistant turn. Appends a synthetic
+ * trailing user turn (only when actually needed — a history already ending in 'user' is passed
+ * through unchanged, since two consecutive same-role turns are equally invalid) standing in for
+ * the user's implicit "yes, generate it" from clicking the button. Found via real Web testing
+ * (Anthropic API 400 invalid_request_error). */
+export function buildPlanGenerationMessages(messages: ChatMessage[]): ChatMessage[] {
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== 'assistant') return messages;
+  return [...messages, { role: 'user', content: 'Please generate the final learning plan now, based on our conversation so far.' }];
+}
+
 export function createAiAdapter(config: { anthropicApiKey: string; openaiApiKey: string }): AiAdapter {
   const anthropic = new Anthropic({ apiKey: config.anthropicApiKey });
   const openai = new OpenAI({ apiKey: config.openaiApiKey });
@@ -62,7 +77,7 @@ export function createAiAdapter(config: { anthropicApiKey: string; openaiApiKey:
           system:
             `Produce a JSON learning plan for target language "${targetLang}" as a single ` +
             '```json ... ``` code block matching the LearningPlanJSON schema. No prose outside the block.',
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          messages: buildPlanGenerationMessages(messages).map((m) => ({ role: m.role, content: m.content })),
         });
         const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
         return parsePlanResponse(text);
