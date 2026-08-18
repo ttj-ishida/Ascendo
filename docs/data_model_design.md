@@ -99,7 +99,7 @@ for each row execute function public.protect_plan_tier_columns();
 
 ### 2-5. `try_consume_plan_generation(uuid)` — AI学習計画生成の無料枠をアトミックに消費
 
-MVPでは生涯1回固定(`requirements_mvp.md` 9-1)。行ロックで競合状態を回避する(`app_project_handoff.md` 5-2の8番)。
+MVPでは無料枠は生涯1回固定(`requirements_mvp.md` 9-1)。行ロックで競合状態を回避する(`app_project_handoff.md` 5-2の8番)。**2026-08-19変更**: 課金ユーザー(`profiles.plan_tier = 'paid'`かつ`paid_until`が未来)は課金期間中`plan_generation_count`を消費せず無制限に生成できるよう変更(元は無料/有料を問わず生涯1回に固定されていた。動作確認用アカウントで無料枠を使い切った際に判明)。
 
 ```sql
 create or replace function public.try_consume_plan_generation(p_user_id uuid)
@@ -108,14 +108,21 @@ language plpgsql security definer set search_path = public
 as $$
 declare
   v_count int;
+  v_plan_tier plan_tier;
+  v_paid_until timestamptz;
 begin
-  select plan_generation_count into v_count
+  select plan_generation_count, plan_tier, paid_until
+    into v_count, v_plan_tier, v_paid_until
   from public.profiles
   where id = p_user_id
   for update;
 
   if v_count is null then
     raise exception 'profile not found: %', p_user_id;
+  end if;
+
+  if v_plan_tier = 'paid' and v_paid_until is not null and v_paid_until > now() then
+    return true;
   end if;
 
   if v_count >= 1 then

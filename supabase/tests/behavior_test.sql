@@ -326,9 +326,58 @@ begin
   raise notice 'CHECK 14 PASSED: increment_actual_minutes() adds atomically and enforces ownership';
 end $$;
 
+-- ============================================================
+-- CHECK 15: try_consume_plan_generation() lets an active paid subscriber generate unlimited
+-- plans without touching plan_generation_count, but falls back to the free one-time rule once
+-- their subscription expires (added after a real testing account hit the free-tier cap and the
+-- user asked for paid users to be unlimited for the duration of their subscription)
+-- ============================================================
+do $$
+declare
+  v_count_before int;
+  v_count_after int;
+  v_result boolean;
+begin
+  -- user1 already has plan_generation_count = 1 from CHECK 3 (free quota exhausted).
+  -- Direct UPDATE bypasses protect_plan_tier_columns() here since this script runs with
+  -- superuser/service_role privileges in the SQL Editor, not as the "authenticated" role CHECK 2
+  -- switched into (and reset out of before CHECK 3).
+  update public.profiles
+  set plan_tier = 'paid', paid_until = now() + interval '30 days'
+  where id = '11111111-1111-1111-1111-111111111111';
+
+  select plan_generation_count into v_count_before
+  from public.profiles where id = '11111111-1111-1111-1111-111111111111';
+
+  select public.try_consume_plan_generation('11111111-1111-1111-1111-111111111111') into v_result;
+
+  select plan_generation_count into v_count_after
+  from public.profiles where id = '11111111-1111-1111-1111-111111111111';
+
+  if v_result is not true then
+    raise exception 'CHECK 15 FAILED: active paid subscriber was denied plan generation';
+  end if;
+  if v_count_after <> v_count_before then
+    raise exception 'CHECK 15 FAILED: plan_generation_count changed (% -> %) for a paid subscriber', v_count_before, v_count_after;
+  end if;
+
+  -- Now expire the subscription: should fall back to the (already-exhausted) free-tier rule.
+  update public.profiles
+  set paid_until = now() - interval '1 day'
+  where id = '11111111-1111-1111-1111-111111111111';
+
+  select public.try_consume_plan_generation('11111111-1111-1111-1111-111111111111') into v_result;
+
+  if v_result is not false then
+    raise exception 'CHECK 15 FAILED: expired-subscription user was still granted unlimited plan generation';
+  end if;
+
+  raise notice 'CHECK 15 PASSED: paid subscribers bypass the free quota while active, and lose that bypass once expired';
+end $$;
+
 do $$
 begin
-  raise notice 'ALL 14 BEHAVIOR CHECKS PASSED';
+  raise notice 'ALL 15 BEHAVIOR CHECKS PASSED';
 end $$;
 
 rollback;
