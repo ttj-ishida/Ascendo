@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import Constants from 'expo-constants';
 import { supabase } from '../../lib/supabase';
 import { callApi } from '../../lib/api-client';
+import { apiBaseUrl } from '../../lib/api-base-url';
 import { useAuth } from '../auth/AuthContext';
 import { computeScore } from './scoring';
 import { Card } from '../../components/Card';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
-
-const { apiBaseUrl } = Constants.expoConfig?.extra ?? {};
 
 interface AssessmentItem {
   position: number;
@@ -28,7 +26,7 @@ export function AssessmentRunner({ sourceGroupIds, onFinished }: { sourceGroupId
   useEffect(() => {
     if (auth.status !== 'signed-in') return;
     callApi<{ id: string; items: AssessmentItem[] }>(
-      { fetchFn: fetch, baseUrl: apiBaseUrl as string, accessToken: auth.accessToken },
+      { fetchFn: fetch, baseUrl: apiBaseUrl, accessToken: auth.accessToken },
       '/api/v1/assessments',
       { method: 'POST', body: JSON.stringify({ sourceGroupIds, itemCount: 5 }) },
     ).then((result) => {

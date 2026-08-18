@@ -1,15 +1,13 @@
 import { Alert, View, Text, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import Constants from 'expo-constants';
 import { supabase } from '../../../src/lib/supabase';
+import { apiBaseUrl } from '../../../src/lib/api-base-url';
 import { useAuth } from '../../../src/features/auth/AuthContext';
 import { deleteAccount } from '../../../src/features/settings/delete-account';
 import { PrimaryButton } from '../../../src/components/PrimaryButton';
 import { colors } from '../../../src/theme/colors';
 import { spacing } from '../../../src/theme/spacing';
 import { typography } from '../../../src/theme/typography';
-
-const { apiBaseUrl } = Constants.expoConfig?.extra ?? {};
 
 export default function Settings() {
   const auth = useAuth();
@@ -28,7 +26,7 @@ export default function Settings() {
         style: 'destructive',
         onPress: async () => {
           if (auth.status !== 'signed-in') return;
-          await deleteAccount({ fetchFn: fetch, baseUrl: apiBaseUrl as string, accessToken: auth.accessToken });
+          await deleteAccount({ fetchFn: fetch, baseUrl: apiBaseUrl, accessToken: auth.accessToken });
           router.replace('/(auth)/onboarding');
         },
       },

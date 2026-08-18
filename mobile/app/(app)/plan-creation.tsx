@@ -1,8 +1,8 @@
 import { useEffect, useReducer, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
-import Constants from 'expo-constants';
 import { callApi, ApiError } from '../../src/lib/api-client';
+import { apiBaseUrl } from '../../src/lib/api-base-url';
 import { chatReducer } from '../../src/features/plan-creation/chat-reducer';
 import { useAuth } from '../../src/features/auth/AuthContext';
 import { supabase } from '../../src/lib/supabase';
@@ -12,7 +12,6 @@ import { colors } from '../../src/theme/colors';
 import { spacing } from '../../src/theme/spacing';
 import { typography } from '../../src/theme/typography';
 
-const { apiBaseUrl } = Constants.expoConfig?.extra ?? {};
 const TARGET_LANG = 'en';
 
 export default function PlanCreation() {
@@ -30,7 +29,7 @@ export default function PlanCreation() {
   useEffect(() => {
     if (auth.status !== 'signed-in') return;
     callApi<{ messages: typeof state.messages; readyToGenerate: boolean }>(
-      { fetchFn: fetch, baseUrl: apiBaseUrl as string, accessToken: auth.accessToken },
+      { fetchFn: fetch, baseUrl: apiBaseUrl, accessToken: auth.accessToken },
       `/api/v1/plans/draft?targetLang=${TARGET_LANG}`,
     )
       .then((draft) => {
@@ -61,7 +60,7 @@ export default function PlanCreation() {
 
     try {
       const result = await callApi<{ reply: string; readyToGenerate: boolean }>(
-        { fetchFn: fetch, baseUrl: apiBaseUrl as string, accessToken: auth.accessToken },
+        { fetchFn: fetch, baseUrl: apiBaseUrl, accessToken: auth.accessToken },
         '/api/v1/plans/chat',
         { method: 'POST', body: JSON.stringify({ targetLang: TARGET_LANG, messages: [...state.messages, { role: 'user', content }] }) },
       );
@@ -75,7 +74,7 @@ export default function PlanCreation() {
     if (auth.status !== 'signed-in') return;
     try {
       await callApi(
-        { fetchFn: fetch, baseUrl: apiBaseUrl as string, accessToken: auth.accessToken },
+        { fetchFn: fetch, baseUrl: apiBaseUrl, accessToken: auth.accessToken },
         '/api/v1/plans',
         { method: 'POST', body: JSON.stringify({ targetLang: TARGET_LANG, messages: state.messages }) },
       );
