@@ -107,6 +107,10 @@ export function createAiAdapter(config: { anthropicApiKey: string; openaiApiKey:
     },
 
     async generatePlan(messages, targetLang, contentGroups) {
+      // Declared outside the try so it's available in the catch block below — parsePlanResponse
+      // failing (e.g. "missing required field") previously surfaced only that field name, with no
+      // way to see what Claude actually sent back to explain why it was missing.
+      let text = '';
       try {
         const response = await anthropic.messages.create({
           model: 'claude-sonnet-5',
@@ -114,11 +118,14 @@ export function createAiAdapter(config: { anthropicApiKey: string; openaiApiKey:
           system: buildPlanGenerationSystemPrompt(targetLang, contentGroups),
           messages: buildPlanGenerationMessages(messages).map((m) => ({ role: m.role, content: m.content })),
         });
-        const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+        text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
         return parsePlanResponse(text);
       } catch (err) {
         if (err instanceof AppError) throw err;
-        throw new AppError('AI_PROVIDER_ERROR', 'Claude plan generation failed', { cause: String(err) });
+        throw new AppError('AI_PROVIDER_ERROR', 'Claude plan generation failed', {
+          cause: String(err),
+          rawResponsePreview: text.slice(0, 4000),
+        });
       }
     },
 
