@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { AppError } from '../../shared/errors.ts';
 import { recordAiUsage } from '../admin/service.ts';
 import type { AiAdapter } from '../../shared/ai-adapter.ts';
-import type { ChatMessage } from '../../types.ts';
+import type { ChatMessage, ContentGroupOption } from '../../types.ts';
 
 export interface PlansServiceDeps {
   aiAdapter: AiAdapter;
@@ -74,6 +74,17 @@ export interface CreatePlanDeps extends PlansServiceDeps {
   userClient: SupabaseClient;
 }
 
+/** The content options the AI is allowed to reference (ADR-05: it selects among existing
+ * content_groups, it never invents content). Queried via userClient, so RLS already limits the
+ * result to published system groups plus the caller's own — no extra filtering needed here. */
+async function fetchContentGroupOptions(userClient: Pick<SupabaseClient, 'from'>): Promise<ContentGroupOption[]> {
+  const { data, error } = await userClient.from('content_groups').select('id, title, type');
+  if (error) {
+    throw new Error(`failed to fetch content_groups: ${error.message}`);
+  }
+  return (data ?? []) as ContentGroupOption[];
+}
+
 export async function createPlan(
   deps: CreatePlanDeps,
   params: { userId: string; targetLang: string; messages: ChatMessage[] },
@@ -88,7 +99,8 @@ export async function createPlan(
     throw new AppError('FREE_QUOTA_EXHAUSTED', 'Free plan-generation quota already used');
   }
 
-  const planJson = await deps.aiAdapter.generatePlan(params.messages, params.targetLang);
+  const contentGroups = await fetchContentGroupOptions(deps.userClient);
+  const planJson = await deps.aiAdapter.generatePlan(params.messages, params.targetLang, contentGroups);
 
   const { data: row, error: insertError } = await deps.userClient
     .from('learning_plans')

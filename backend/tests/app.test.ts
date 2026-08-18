@@ -28,6 +28,9 @@ function buildFakeDeps(overrides: Partial<AppDeps> = {}): AppDeps {
         if (table === 'plan_creation_drafts') {
           return { upsert: () => Promise.resolve({ error: null }), delete: () => draftChain, select: () => draftChain };
         }
+        if (table === 'content_groups') {
+          return { select: () => Promise.resolve({ data: [], error: null }) };
+        }
         return {
           insert: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: 'plan-1', target_lang: 'en', plan_json: {}, created_at: 'now' }, error: null }) }) }),
         };

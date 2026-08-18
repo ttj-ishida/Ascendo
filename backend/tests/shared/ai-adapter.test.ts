@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePlanResponse, buildPlanGenerationMessages } from '../../src/shared/ai-adapter.ts';
+import { parsePlanResponse, buildPlanGenerationMessages, buildPlanGenerationSystemPrompt } from '../../src/shared/ai-adapter.ts';
 
 test('parsePlanResponse extracts LearningPlanJSON from a fenced JSON code block', () => {
   const raw = [
@@ -54,4 +54,25 @@ test('buildPlanGenerationMessages leaves a history already ending with the user 
 
 test('buildPlanGenerationMessages leaves an empty history unchanged', () => {
   assert.deepEqual(buildPlanGenerationMessages([]), []);
+});
+
+test('buildPlanGenerationSystemPrompt names every required LearningPlanJSON field', () => {
+  const prompt = buildPlanGenerationSystemPrompt('en', []);
+
+  for (const field of ['goal', 'currentLevel', 'weeklyAvailableHours', 'phases', 'contentGroupIds']) {
+    assert.ok(prompt.includes(field), `expected prompt to mention "${field}"`);
+  }
+});
+
+test('buildPlanGenerationSystemPrompt embeds the given content groups for the AI to choose from', () => {
+  const prompt = buildPlanGenerationSystemPrompt('en', [{ id: 'g1', title: 'Basic Vocab', type: 'vocabulary' }]);
+
+  assert.ok(prompt.includes('"id":"g1"'));
+  assert.ok(prompt.includes('"title":"Basic Vocab"'));
+});
+
+test('buildPlanGenerationSystemPrompt handles an empty content-groups list without erroring', () => {
+  const prompt = buildPlanGenerationSystemPrompt('en', []);
+
+  assert.ok(prompt.includes('[]'));
 });

@@ -44,6 +44,7 @@ function fakeUserClient(opts: {
   rpcResult: { data: unknown; error: unknown };
   insertResult: { data: unknown; error: unknown };
   draftDeleteError?: { code?: string; message: string } | null;
+  contentGroupsResult?: { data: unknown; error: unknown };
 }) {
   const draftDeleteEqCalls: [string, unknown][] = [];
   return {
@@ -52,6 +53,9 @@ function fakeUserClient(opts: {
       from: (table: string) => {
         if (table === 'plan_creation_drafts') {
           return { delete: () => fakeDraftDeleteChain((col, val) => draftDeleteEqCalls.push([col, val]), opts.draftDeleteError ?? null) };
+        }
+        if (table === 'content_groups') {
+          return { select: () => Promise.resolve(opts.contentGroupsResult ?? { data: [], error: null }) };
         }
         return {
           insert: () => ({
@@ -85,6 +89,34 @@ test('createPlan consumes the free quota, inserts the plan, clears the draft, an
     ['profile_id', '11111111-1111-1111-1111-111111111111'],
     ['target_lang', 'en'],
   ]);
+});
+
+test('createPlan passes the RLS-visible content_groups to the AI adapter (ADR-05 grounding)', async () => {
+  const insertedRow = {
+    id: 'plan-1', target_lang: 'en', status: 'active', plan_json: SAMPLE_PLAN, created_at: '2026-08-10T00:00:00Z',
+  };
+  const { client: userClient } = fakeUserClient({
+    rpcResult: { data: true, error: null },
+    insertResult: { data: insertedRow, error: null },
+    contentGroupsResult: { data: [{ id: 'g1', title: 'Basic Vocab', type: 'vocabulary' }], error: null },
+  });
+
+  let receivedContentGroups: unknown;
+  const spyAdapter: AiAdapter = {
+    chat: async () => { throw new Error('not used'); },
+    generatePlan: async (_messages, _targetLang, contentGroups) => {
+      receivedContentGroups = contentGroups;
+      return SAMPLE_PLAN;
+    },
+    generateSpeech: async () => { throw new Error('not used'); },
+  };
+
+  await createPlan(
+    { aiAdapter: spyAdapter, serviceClient: fakeServiceClient() as never, userClient: userClient as never },
+    { userId: 'u1', targetLang: 'en', messages: [{ role: 'user', content: 'hi' }] },
+  );
+
+  assert.deepEqual(receivedContentGroups, [{ id: 'g1', title: 'Basic Vocab', type: 'vocabulary' }]);
 });
 
 test('createPlan throws FREE_QUOTA_EXHAUSTED when the quota RPC returns false', async () => {

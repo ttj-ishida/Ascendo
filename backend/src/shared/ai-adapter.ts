@@ -1,11 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { AppError } from './errors.ts';
-import type { ChatMessage, LearningPlanJSON } from '../types.ts';
+import type { ChatMessage, ContentGroupOption, LearningPlanJSON } from '../types.ts';
 
 export interface AiAdapter {
   chat(messages: ChatMessage[]): Promise<{ reply: string; readyToGenerate: boolean }>;
-  generatePlan(messages: ChatMessage[], targetLang: string): Promise<LearningPlanJSON>;
+  generatePlan(messages: ChatMessage[], targetLang: string, contentGroups: ContentGroupOption[]): Promise<LearningPlanJSON>;
   generateSpeech(text: string, voice?: string): Promise<{ audioBuffer: Buffer; costUsd: number }>;
 }
 
@@ -45,6 +45,43 @@ export function buildPlanGenerationMessages(messages: ChatMessage[]): ChatMessag
   return [...messages, { role: 'user', content: 'Please generate the final learning plan now, based on our conversation so far.' }];
 }
 
+/** Builds the system prompt for plan generation. Grounds the AI in the actual available content
+ * (ADR-05: the AI selects among existing content_groups, it never invents content) and spells out
+ * the exact JSON shape field-by-field — previously the prompt only said to match "the
+ * LearningPlanJSON schema" by name with no further detail, and Claude's output routinely omitted
+ * required fields (e.g. "goal") as a result (found via real Web testing). Pure/exported so the
+ * prompt text is reviewable and testable independent of the Anthropic SDK call. */
+export function buildPlanGenerationSystemPrompt(targetLang: string, contentGroups: ContentGroupOption[]): string {
+  const contentGroupsJson = JSON.stringify(contentGroups.map((g) => ({ id: g.id, title: g.title, type: g.type })));
+  return [
+    `Produce a JSON learning plan for target language "${targetLang}".`,
+    'Respond with exactly one ```json ... ``` code block and no prose outside it.',
+    'The JSON must match this TypeScript shape exactly (every field is required unless marked optional):',
+    '```ts',
+    'interface LearningPlanJSON {',
+    "  goal: string;                 // the user's stated goal, from the conversation",
+    "  currentLevel: string;         // the user's self-reported current level",
+    '  weeklyAvailableHours: number; // hours per week the user said they can study',
+    '  phases: LearningPhase[];      // 2-4 phases spanning a few months, building toward the goal',
+    '  contentGroupIds: string[];    // a subset of the ids from CONTENT_GROUPS below (empty array if none fit)',
+    '}',
+    'interface LearningPhase {',
+    '  id: string;                   // any short unique slug, e.g. "phase-1"',
+    '  name: string;                 // e.g. "Phase 1: 基礎固め"',
+    '  startDate: string;            // ISO8601 date',
+    '  endDate: string;              // ISO8601 date',
+    '  weeklyTasks: WeeklyTask[];',
+    '  monthlyTasks: MonthlyTask[];',
+    '  milestones: Milestone[];',
+    '}',
+    'interface WeeklyTask { id: string; label: string; contentGroupId?: string; } // contentGroupId must be one of CONTENT_GROUPS\' ids if present',
+    'interface MonthlyTask { id: string; label: string; month: string; } // "2026-09" format',
+    'interface Milestone { id: string; label: string; targetValue: string; }',
+    '```',
+    `CONTENT_GROUPS (choose contentGroupIds/contentGroupId only from these ids; never invent an id; use an empty array if this list is empty): ${contentGroupsJson}`,
+  ].join('\n');
+}
+
 export function createAiAdapter(config: { anthropicApiKey: string; openaiApiKey: string }): AiAdapter {
   const anthropic = new Anthropic({ apiKey: config.anthropicApiKey });
   const openai = new OpenAI({ apiKey: config.openaiApiKey });
@@ -69,14 +106,12 @@ export function createAiAdapter(config: { anthropicApiKey: string; openaiApiKey:
       }
     },
 
-    async generatePlan(messages, targetLang) {
+    async generatePlan(messages, targetLang, contentGroups) {
       try {
         const response = await anthropic.messages.create({
           model: 'claude-sonnet-5',
           max_tokens: 4096,
-          system:
-            `Produce a JSON learning plan for target language "${targetLang}" as a single ` +
-            '```json ... ``` code block matching the LearningPlanJSON schema. No prose outside the block.',
+          system: buildPlanGenerationSystemPrompt(targetLang, contentGroups),
           messages: buildPlanGenerationMessages(messages).map((m) => ({ role: m.role, content: m.content })),
         });
         const text = response.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
