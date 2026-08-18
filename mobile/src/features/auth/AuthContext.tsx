@@ -1,8 +1,28 @@
-import { createContext, useContext, useEffect, useReducer, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useReducer, type ReactNode } from 'react';
 import { supabase } from '../../lib/supabase';
 import { authReducer, type AuthState } from './auth-reducer';
 
 const AuthStateContext = createContext<AuthState>({ status: 'loading' });
+
+interface AuthActions {
+  /** Re-queries whether the caller currently has an active learning_plans row and updates the
+   * cached hasActivePlan accordingly. Exposed so screens that change plan status themselves
+   * (e.g. Settings' "学習計画を作り直す", which sets the active plan to 'abandoned') can sync
+   * AuthContext immediately instead of waiting for the next sign-in/tab-refocus cycle that
+   * normally triggers this — without it, (app)/_layout.tsx's guard would keep believing a plan
+   * exists until something else happened to re-run the check. */
+  refreshActivePlan: () => Promise<void>;
+}
+
+const AuthActionsContext = createContext<AuthActions>({ refreshActivePlan: async () => {} });
+
+async function resolveHasActivePlan(): Promise<boolean> {
+  const { count } = await supabase
+    .from('learning_plans')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'active');
+  return (count ?? 0) > 0;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, { status: 'loading' });
@@ -40,16 +60,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // visible as an infinite "hasActivePlan: false" / "hasActivePlan: null" render alternation).
   useEffect(() => {
     if (state.status !== 'signed-in') return;
-    supabase
-      .from('learning_plans')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'active')
-      .then(({ count }) => dispatch({ type: 'ACTIVE_PLAN_RESOLVED', hasActivePlan: (count ?? 0) > 0 }));
+    resolveHasActivePlan().then((hasActivePlan) => dispatch({ type: 'ACTIVE_PLAN_RESOLVED', hasActivePlan }));
   }, [state.status]);
 
-  return <AuthStateContext.Provider value={state}>{children}</AuthStateContext.Provider>;
+  const refreshActivePlan = useCallback(async () => {
+    const hasActivePlan = await resolveHasActivePlan();
+    dispatch({ type: 'ACTIVE_PLAN_RESOLVED', hasActivePlan });
+  }, []);
+
+  return (
+    <AuthStateContext.Provider value={state}>
+      <AuthActionsContext.Provider value={{ refreshActivePlan }}>{children}</AuthActionsContext.Provider>
+    </AuthStateContext.Provider>
+  );
 }
 
 export function useAuth(): AuthState {
   return useContext(AuthStateContext);
+}
+
+export function useAuthActions(): AuthActions {
+  return useContext(AuthActionsContext);
 }
