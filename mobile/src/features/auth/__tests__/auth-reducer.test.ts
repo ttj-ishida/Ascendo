@@ -2,9 +2,9 @@ import { authReducer, type AuthState } from '../auth-reducer';
 
 const LOADING: AuthState = { status: 'loading' };
 
-test('SIGNED_IN event moves from loading to signed-in with user/token, plan status unresolved', () => {
+test('SESSION_UPDATED moves from loading to signed-in with user/token, plan status unresolved', () => {
   const next = authReducer(LOADING, {
-    type: 'SIGNED_IN',
+    type: 'SESSION_UPDATED',
     userId: '11111111-1111-1111-1111-111111111111',
     accessToken: 'tok-abc',
   });
@@ -14,6 +14,18 @@ test('SIGNED_IN event moves from loading to signed-in with user/token, plan stat
     accessToken: 'tok-abc',
     hasActivePlan: null,
   });
+});
+
+test('SESSION_UPDATED for a different user resets hasActivePlan (a genuine new sign-in)', () => {
+  const signedInAsA: AuthState = { status: 'signed-in', userId: 'user-a', accessToken: 'old', hasActivePlan: true };
+  const next = authReducer(signedInAsA, { type: 'SESSION_UPDATED', userId: 'user-b', accessToken: 'new' });
+  expect(next).toEqual({ status: 'signed-in', userId: 'user-b', accessToken: 'new', hasActivePlan: null });
+});
+
+test('SESSION_UPDATED for the same user updates the token but preserves hasActivePlan (token refresh, tab refocus, etc.)', () => {
+  const signedIn: AuthState = { status: 'signed-in', userId: 'u1', accessToken: 'old', hasActivePlan: true };
+  const next = authReducer(signedIn, { type: 'SESSION_UPDATED', userId: 'u1', accessToken: 'new' });
+  expect(next).toEqual({ status: 'signed-in', userId: 'u1', accessToken: 'new', hasActivePlan: true });
 });
 
 test('SIGNED_OUT event moves to signed-out from any prior state', () => {
@@ -31,12 +43,6 @@ test('INITIAL_SESSION with a session moves loading to signed-in, plan status unr
     session: { userId: 'u1', accessToken: 't1' },
   });
   expect(next).toEqual({ status: 'signed-in', userId: 'u1', accessToken: 't1', hasActivePlan: null });
-});
-
-test('TOKEN_REFRESHED updates the access token while staying signed-in and preserves plan status', () => {
-  const signedIn: AuthState = { status: 'signed-in', userId: 'u1', accessToken: 'old', hasActivePlan: true };
-  const next = authReducer(signedIn, { type: 'TOKEN_REFRESHED', accessToken: 'new' });
-  expect(next).toEqual({ status: 'signed-in', userId: 'u1', accessToken: 'new', hasActivePlan: true });
 });
 
 test('ACTIVE_PLAN_RESOLVED sets hasActivePlan while staying signed-in', () => {

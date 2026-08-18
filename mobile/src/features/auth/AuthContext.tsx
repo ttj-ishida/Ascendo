@@ -18,12 +18,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: subscription } = supabase.auth.onAuthStateChange((event, session) => {
+      // Every event that carries a session (SIGNED_IN, TOKEN_REFRESHED, and — found via real Web
+      // testing — a same-user SIGNED_IN supabase-js re-emits when a browser tab regains focus and
+      // revalidates its session) goes through one SESSION_UPDATED event. The reducer itself
+      // decides whether that's a genuine new sign-in (resets hasActivePlan) or just a refresh for
+      // the user we already know about (must not reset it — see auth-reducer.ts).
       if (event === 'SIGNED_OUT') {
         dispatch({ type: 'SIGNED_OUT' });
-      } else if (event === 'TOKEN_REFRESHED' && session) {
-        dispatch({ type: 'TOKEN_REFRESHED', accessToken: session.access_token });
       } else if (session) {
-        dispatch({ type: 'SIGNED_IN', userId: session.user.id, accessToken: session.access_token });
+        dispatch({ type: 'SESSION_UPDATED', userId: session.user.id, accessToken: session.access_token });
       }
     });
 
