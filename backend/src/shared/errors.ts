@@ -35,7 +35,15 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     // meant reading the client's network tab only. Logging it here (one line, no stack trace
     // since it's not a bug) keeps the terminal running `npm start` a useful source of truth for
     // "why did that request fail", matching what the client-side api-client.ts now logs too.
-    console.error(`[error] ${req.method} ${req.originalUrl} -> ${err.status} ${err.code}: ${err.message}`);
+    // `details` (e.g. ai-adapter.ts's { cause: String(err) } wrapping the underlying Anthropic/
+    // OpenAI SDK error) is sent to the client but was missing from this log line — meaning the
+    // one place that actually explains an AI_PROVIDER_ERROR (bad API key, wrong model name, no
+    // credits, etc.) only ever showed up in the browser console, never in the backend's own
+    // terminal. Logging it here too.
+    console.error(
+      `[error] ${req.method} ${req.originalUrl} -> ${err.status} ${err.code}: ${err.message}`,
+      err.details !== undefined ? err.details : '',
+    );
     res.status(err.status).json({
       error: { code: err.code, message: err.message, ...(err.details !== undefined ? { details: err.details } : {}) },
     });
