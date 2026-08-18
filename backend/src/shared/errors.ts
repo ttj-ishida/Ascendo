@@ -28,14 +28,20 @@ export class AppError extends Error {
   }
 }
 
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
+export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
   if (err instanceof AppError) {
+    // AppError (4xx/502) is "expected" application-level rejection (bad auth, quota exhausted,
+    // etc.), but previously produced zero server-side output — diagnosing a failing request
+    // meant reading the client's network tab only. Logging it here (one line, no stack trace
+    // since it's not a bug) keeps the terminal running `npm start` a useful source of truth for
+    // "why did that request fail", matching what the client-side api-client.ts now logs too.
+    console.error(`[error] ${req.method} ${req.originalUrl} -> ${err.status} ${err.code}: ${err.message}`);
     res.status(err.status).json({
       error: { code: err.code, message: err.message, ...(err.details !== undefined ? { details: err.details } : {}) },
     });
     return;
   }
 
-  console.error(err);
+  console.error(`[error] ${req.method} ${req.originalUrl} -> 500 INTERNAL_ERROR`, err);
   res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
 }

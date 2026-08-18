@@ -33,6 +33,22 @@ test('callApi sends the Authorization header and joins baseUrl + path', async ()
   expect(capturedHeaders?.Authorization).toBe('Bearer tok-123');
 });
 
+test('callApi throws a NETWORK_ERROR ApiError when fetch itself rejects (server unreachable / CORS blocked)', async () => {
+  const failingFetch = (async () => {
+    throw new TypeError('Failed to fetch');
+  }) as unknown as typeof fetch;
+
+  await expect(
+    callApi({ fetchFn: failingFetch, baseUrl: 'http://x', accessToken: 'tok' }, '/api/v1/plans/chat', { method: 'POST' }),
+  ).rejects.toThrow(ApiError);
+
+  try {
+    await callApi({ fetchFn: failingFetch, baseUrl: 'http://x', accessToken: 'tok' }, '/api/v1/plans/chat', { method: 'POST' });
+  } catch (err) {
+    expect((err as ApiError).code).toBe('NETWORK_ERROR');
+  }
+});
+
 test('callApi throws ApiError with the code/message from the error envelope on failure', async () => {
   await expect(
     callApi(
