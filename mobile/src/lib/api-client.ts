@@ -13,10 +13,17 @@ export async function callApi<T>(
 ): Promise<T> {
   const method = init.method ?? 'GET';
   const url = `${deps.baseUrl}${path}`;
+  // Callers pass the bare global `fetch` as fetchFn (e.g. `{ fetchFn: fetch, ... }`). Calling it
+  // as `deps.fetchFn(...)` invokes it with `this` bound to `deps`, not `window` — harmless on
+  // React Native's fetch polyfill, but the real browser's native fetch on Web requires `this` to
+  // be the Window and throws "TypeError: Failed to execute 'fetch' on 'Window': Illegal
+  // invocation" otherwise (found via real Web testing). Re-binding here, once, fixes every call
+  // site without each one needing to remember `fetch.bind(window)`.
+  const fetchFn = deps.fetchFn.bind(globalThis);
 
   let response: Response;
   try {
-    response = await deps.fetchFn(url, {
+    response = await fetchFn(url, {
       ...init,
       headers: {
         'Content-Type': 'application/json',
